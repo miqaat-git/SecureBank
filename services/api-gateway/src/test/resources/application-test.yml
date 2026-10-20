@@ -1,0 +1,17 @@
+# Test profile. Downstream base URLs are injected at runtime by the mock servers
+# (see Downstreams.register). The issuer is a non-resolvable placeholder: tests replace the
+# decoder with an in-memory one and never contact an identity provider.
+securebank:
+  security:
+    jwt-issuer-uri: https://idp.securebank.invalid/realms/test
+  timeouts:
+    connect: 500ms
+    response: 700ms
+  cors:
+    allowed-origins: https://app.securebank.test
+  limits:
+    max-request-body-size: 1KB
+
+logging:
+  level:
+    com.securebank.gateway: WARN

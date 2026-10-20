@@ -1,0 +1,14 @@
+target/
+*.log
+*.iml
+.idea/
+.vscode/
+.classpath
+.project
+.settings/
+.env
+*.env
+*.pem
+*.key
+*.p12
+*.jks

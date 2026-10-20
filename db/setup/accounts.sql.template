@@ -1,0 +1,16 @@
+-- SecureBank database accounts (blueprint 3.1, C7). Template: the placeholders in @...@ are
+-- replaced by db/setup/create-db-accounts.sh (and by DatabaseAccountSeparationTest).
+-- Run as a MySQL administrator, outside Flyway. Passwords never appear in the repository.
+--
+-- Phase 0 baseline (see blueprint N3): the application account gets SELECT and INSERT on the
+-- schema, which already satisfies the append-only rule (no UPDATE, no DELETE, no DDL). Phase 1
+-- adds table-level UPDATE for the mutable tables only.
+
+CREATE DATABASE IF NOT EXISTS `@SCHEMA@` CHARACTER SET utf8mb4;
+
+CREATE USER IF NOT EXISTS '@APP_USER@'@'@HOST@' IDENTIFIED BY '@APP_PASSWORD@';
+CREATE USER IF NOT EXISTS '@MIGRATE_USER@'@'@HOST@' IDENTIFIED BY '@MIGRATE_PASSWORD@';
+
+GRANT SELECT, INSERT ON `@SCHEMA@`.* TO '@APP_USER@'@'@HOST@';
+
+GRANT CREATE, ALTER, DROP, INDEX, REFERENCES, CREATE VIEW, TRIGGER, SELECT, INSERT, UPDATE, DELETE ON `@SCHEMA@`.* TO '@MIGRATE_USER@'@'@HOST@';

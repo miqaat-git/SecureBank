@@ -1,0 +1,45 @@
+SecureBank ledger-service - file manifest
+==========================================
+Spring Boot 3.5.15 | Java 21 | Maven | MySQL 8.0 + Flyway | port 8083 | db securebank_ledger
+Build status: sources syntax-checked only; NOT compiled or tested by the author (see README).
+
+ROOT
+  pom.xml                                   Maven build (Spring Boot parent 3.5.15, Springdoc 2.8.14)
+  README.md                                 Setup, API, accounting convention, idempotency, security, limitations
+  manifest.txt                              This file
+  .gitignore                                Excludes build output, IDE files and secrets
+  (no Maven wrapper: could not be generated offline; see README section 1)
+
+DATABASE SCRIPTS (not on the classpath, run once by a DBA)
+  docs/database/01-create-database-and-users.sql   Schema + least-privilege migrator/app users (placeholders only)
+
+MAIN RESOURCES
+  src/main/resources/application.yml                       Production config (env-var driven, ddl-auto=validate)
+  src/main/resources/db/migration/V1__create_ledger_tables.sql   Flyway: journal_entries, journal_lines, constraints, indexes
+
+MAIN JAVA (com.securebank.ledger)
+  LedgerServiceApplication.java
+  config/      LedgerConstants, LedgerProperties, LedgerConfig (Clock), OpenApiConfig
+  enums/       EntryStatus, EntryType
+  entity/      JournalEntry, JournalLine (immutable JPA entities)
+  repository/  JournalEntryRepository, JournalLineRepository, JournalEntrySpecifications, AccountTotals
+  dto/         CreateJournalEntryRequest, JournalLineRequest, ReverseEntryRequest,
+               JournalEntryResponse, JournalEntrySummaryResponse, JournalLineResponse,
+               AccountLedgerLineResponse, AccountMovementResponse, PageResponse, ApiError
+  exception/   LedgerException (+ InvalidJournalEntry/InvalidQuery/ResourceNotFound/Conflict), ApiExceptionHandler
+  service/     JournalEntryService, AccountLedgerService, JournalEntryValidator, RequestFingerprint,
+               JournalMapper, Money, QuerySupport, PostingResult
+  controller/  JournalEntryController, AccountLedgerController
+  security/    SecurityConfig, KeycloakJwtAuthenticationConverter, RestAuthenticationEntryPoint,
+               RestAccessDeniedHandler, SecurityErrorWriter
+
+TEST RESOURCES
+  src/test/resources/application-test.yml   H2 in-memory (MySQL mode); no MySQL, credentials or Keycloak needed
+
+TESTS (src/test/java/com/securebank/ledger)
+  support/   AbstractLedgerTest, TestData, TestJwtDecoderConfig (test-only JwtDecoder)
+  service/   JournalEntryValidatorTest (unit), RequestFingerprintTest (unit), AccountLedgerServiceTest (Mockito),
+             JournalEntryServiceTest (posting, idempotency, concurrency, reversal, pagination),
+             AccountLedgerQueriesTest (account lines + net movement), DatabaseIntegrityTest (constraints, atomic rollback)
+  web/       JournalEntryApiTest (HTTP contract, validation, errors, 401/403, public endpoints)
+  security/  KeycloakJwtAuthenticationConverterTest

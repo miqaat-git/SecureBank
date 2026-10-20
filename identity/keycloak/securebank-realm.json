@@ -1,0 +1,220 @@
+{
+  "realm": "securebank",
+  "enabled": true,
+  "displayName": "SecureBank (educational simulator)",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "customer",
+        "description": "Account Service: a bank customer (needs the customer_id claim)"
+      },
+      {
+        "name": "admin",
+        "description": "Account Service: administrator"
+      },
+      {
+        "name": "transaction-service",
+        "description": "Account Service: internal /internal/** endpoints (service accounts only)"
+      },
+      {
+        "name": "securebank-staff",
+        "description": "Customer Service: staff, read and write customers"
+      },
+      {
+        "name": "securebank-admin",
+        "description": "Customer Service: administrator, may change customer status"
+      },
+      {
+        "name": "bank-admin",
+        "description": "API Gateway: mapped to ROLE_BANK_ADMIN (no gateway rule uses it yet)"
+      },
+      {
+        "name": "ledger-reader",
+        "description": "Ledger Service: read endpoints"
+      },
+      {
+        "name": "ledger-writer",
+        "description": "Ledger Service: post journal entries"
+      },
+      {
+        "name": "ledger-reverser",
+        "description": "Ledger Service: post reversals"
+      }
+    ]
+  },
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"customer_id\",\"displayName\":\"Customer ID\",\"validations\":{\"pattern\":{\"pattern\":\"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$\",\"error-message\":\"Must be a UUID\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"required\":{\"roles\":[]}}]}"
+          ]
+        }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "securebank-web",
+      "name": "SecureBank web front end (authorization code + PKCE)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "customer_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "customer_id",
+            "claim.name": "customer_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "securebank-dev-cli",
+      "name": "LOCAL DEVELOPMENT ONLY: password grant for scripts/get-token.ps1. Remove outside a dev machine.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocolMappers": [
+        {
+          "name": "customer_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "customer_id",
+            "claim.name": "customer_id",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "securebank-transaction-service",
+      "name": "Transaction Service (client-credentials, service account)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${SECUREBANK_TRANSACTION_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-securebank-transaction-service",
+      "enabled": true,
+      "serviceAccountClientId": "securebank-transaction-service",
+      "realmRoles": [
+        "transaction-service",
+        "ledger-writer",
+        "ledger-reverser"
+      ]
+    },
+    {
+      "username": "dev-admin",
+      "enabled": true,
+      "email": "dev-admin@securebank.invalid",
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${SECUREBANK_DEV_ADMIN_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin",
+        "securebank-admin",
+        "securebank-staff",
+        "bank-admin",
+        "ledger-reader"
+      ]
+    },
+    {
+      "username": "dev-staff",
+      "enabled": true,
+      "email": "dev-staff@securebank.invalid",
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Staff",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${SECUREBANK_DEV_STAFF_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "securebank-staff",
+        "ledger-reader"
+      ]
+    },
+    {
+      "username": "dev-customer",
+      "enabled": true,
+      "email": "dev-customer@securebank.invalid",
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "Customer",
+      "attributes": {
+        "customer_id": [
+          "${SECUREBANK_DEV_CUSTOMER_ID:11111111-1111-4111-8111-111111111111}"
+        ]
+      },
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${SECUREBANK_DEV_CUSTOMER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "customer"
+      ]
+    }
+  ]
+}

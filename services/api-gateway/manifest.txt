@@ -1,0 +1,42 @@
+SecureBank API Gateway - delivered files
+STATUS: build and tests NOT RUN at generation time (Maven Central unreachable from the workspace).
+
+.gitignore                                   Ignores build output, IDE files, key/secret files
+README.md                                    Purpose, setup, routes, JWT/Keycloak, ops, integration, limitations
+manifest.txt                                 This file
+pom.xml                                      Spring Boot 3.5.6, Spring Cloud 2025.0.0 gateway (WebFlux), resource server, actuator, tests
+
+src/main/resources/application.yml           Ports, env-driven service URLs, JWT issuer, timeouts, CORS, limits, header stripping, actuator, logging
+
+src/main/java/com/securebank/gateway/
+  GatewayApplication.java                    Spring Boot entry point
+  config/SecureBankProperties.java           Typed configuration (securebank.*)
+  config/RouteConfig.java                    Explicit routes for the four services; base-URL validation; no retries
+  config/GatewayHttpClientConfig.java        Connect and response timeouts for the downstream Netty client
+  config/CorsConfig.java                     Restrictive, configurable CORS source
+  security/SecurityConfig.java               Reactive stateless JWT resource-server chain; public health only
+  security/JwtDecoderConfig.java             Issuer-based lazy reactive JWT decoder; fails startup if issuer missing
+  security/KeycloakAuthorityConverter.java   realm_access.roles -> ROLE_* authorities
+  security/SecurityErrorHandlers.java        Sanitized 401/403 (and 503 when IdP unreachable)
+  error/ErrorResponseWriter.java             Single sanitized JSON error format
+  error/GatewayErrorHandler.java             404 / 502 / 503 / 504 / 500 mapping for gateway-side failures
+  web/CorrelationIdWebFilter.java            Create/validate X-Correlation-Id, propagate downstream, return to caller
+  web/IdentityHeaderStripWebFilter.java      Removes client-supplied identity headers before routing
+  web/AccessLogWebFilter.java                One safe log line per request (no path, query, headers, bodies)
+  web/RequestSizeLimitWebFilter.java         413 for oversized Content-Length
+
+src/test/resources/application-test.yml      Test profile: short timeouts, 1KB body limit, one allowed CORS origin
+src/test/java/com/securebank/gateway/
+  RoutingTest.java                           Route table, path/query/bearer forwarding, POST body, business errors, unknown route
+  ResilienceTest.java                        Correlation ids, timeout, no POST retry, size limit, error sanitization
+  UnavailableDownstreamTest.java             Connection-refused behavior (503) and isolation of other services
+  CorsTest.java                              Preflight and actual-request CORS behavior
+  RouteConfigTest.java                       Base-URL validation
+  config/RouteConfigAccess.java              Test bridge to package-private validator
+  security/GatewaySecurityTest.java          401/403, health public, management protected, header stripping
+  security/JwtConfigurationTest.java         Decoder wiring, fail-fast on missing issuer, authority mapping
+  support/GatewayTest.java                   Composed test annotation (full context, test profile)
+  support/AbstractGatewayTest.java           Shared client, mock-service registration and reset
+  support/Downstreams.java                   Four in-JVM mock services and property registration
+  support/MockDownstream.java                JDK HttpServer echo service with slow/error paths
+  support/TestJwtConfig.java                 In-memory JWT decoder replacing the IdP (placeholder token, no real keys)

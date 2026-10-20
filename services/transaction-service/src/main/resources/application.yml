@@ -1,0 +1,95 @@
+# Production-oriented configuration. Secrets come ONLY from environment variables.
+# No defaults are provided for credentials or the JWT issuer: the service refuses to start without them.
+server:
+  port: 8084
+  shutdown: graceful
+
+spring:
+  application:
+    name: transaction-service
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: ${TRANSACTION_DB_URL:jdbc:mysql://localhost:3306/securebank_transaction}
+    username: ${TRANSACTION_DB_USERNAME}
+    password: ${TRANSACTION_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
+      max-lifetime: 1500000
+      pool-name: transaction-pool
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # schema is owned by Flyway; Hibernate only validates
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    url: ${TRANSACTION_DB_URL:jdbc:mysql://localhost:3306/securebank_transaction}
+    user: ${TRANSACTION_DB_MIGRATION_USERNAME}      # DDL-capable account, used by Flyway only
+    password: ${TRANSACTION_DB_MIGRATION_PASSWORD}
+    locations: classpath:db/migration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SECUREBANK_JWT_ISSUER_URI}   # discovery is lazy: first authenticated request
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true            # /actuator/health/liveness and /actuator/health/readiness
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+securebank:
+  transfer:
+    supported-currencies: INR
+    max-amount: "1000000.00"
+    max-attempts: 5              # remote send attempts per operation before the transfer escalates
+    retry-base-delay: 2s
+    retry-max-delay: 5m
+    lease-duration: 2m           # how long one worker may own a transfer
+    recovery:
+      enabled: true
+      batch-size: 25
+      fixed-delay-ms: 30000
+  security:
+    customer-id-claim: customer_id
+  clients:
+    account:
+      base-url: ${ACCOUNT_SERVICE_BASE_URL:http://localhost:8082}
+      connect-timeout: 2s
+      read-timeout: 5s
+      account-path: /api/v1/accounts/{accountId}
+      operations-path: /internal/accounts/{accountId}/operations
+      operation-path: /internal/accounts/{accountId}/operations/{operationId}
+    ledger:
+      base-url: ${LEDGER_SERVICE_BASE_URL:http://localhost:8083}
+      connect-timeout: 2s
+      read-timeout: 5s
+      post-path: /internal/journal-entries
+      reversal-path: /internal/journal-entries/{businessReference}/reversals
+      lookup-path: /internal/journal-entries/by-reference/{businessReference}
+    auth:
+      mode: ${SERVICE_AUTH_MODE:NONE}            # NONE | STATIC_BEARER
+      static-token: ${SERVICE_AUTH_TOKEN:}
+
+logging:
+  level:
+    root: INFO
+    com.securebank: INFO

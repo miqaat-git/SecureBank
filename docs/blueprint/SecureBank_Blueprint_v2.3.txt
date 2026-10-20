@@ -1,0 +1,1353 @@
+SecureBank — Software Blueprint v2.3 (JSP architecture)
+Status: Final approved blueprint, revised to v2.3 by three documentation-only patches. Decisions D1 to D9 and rules R1 to R3, corrections C1 to C9 (section 0.1), and the resolutions of O1 to O3, I1 to I8, N1 and N2 (section 0.2) were all approved on 17 Oct 2026. Phase 0 begins only on a separate explicit instruction. No implementation code has been written, compiled or run. Nothing in this document is claimed as built or tested.
+Scope reminder: fictional customers, simulated funds, no real banking or payment integrations.
+0. Decision register
+All nine decisions (D1 to D9) and all three rules (R1 to R3) were approved on 17 Oct 2026. None is open. SecureBank is an educational banking simulator with fictional customers and simulated funds, not a real banking platform.
+#
+Decision
+Status
+Approved decision
+Sections affected
+D1
+Technology versions
+Approved
+Keep Spring Boot 3.5.x and Tomcat 10.1; document the support risk accurately; pin compatible dependency versions; include an upgrade-path note; verify version status and compatibility before implementation (Phase 0)
+2.2, 2.3, 11
+D2
+Roles
+Approved
+CUSTOMER and ADMIN only; one role per user; administrators cannot own customer bank accounts
+3, 5, 7
+D3
+Currency
+Approved
+INR only, in integer paise; documented conversion and formatting rules; no floating-point types for money
+3, 8
+D4
+Multi-factor authentication
+Approved
+Out of scope for v1; architecture stays extensible for it; MFA is never claimed as implemented
+5
+D5
+Transfers
+Approved
+Only internal customer-to-customer transfers between eligible SecureBank accounts; no external transfers, payment gateways or real-money integrations
+4, 7
+D6
+Account approval
+Approved
+Account applications need approval before the account is usable; login is active immediately after registration
+3, 7, 9
+D7
+Funding model
+Approved
+No customer deposits or withdrawals; only authorized administrators fund accounts, through auditable, atomic, idempotent funding events; internal transfers remain supported
+3, 4, 5, 7, 8, 9
+D8
+Visual design
+Approved
+The original design brief in 12.4 is the basis for a new interface; no visual reuse from the reference is claimed
+6, 12.4
+D9
+Initial administrator bootstrap
+Approved
+First admin created only when none exists, from credentials supplied through environment configuration; never hardcoded or logged; password change at first login; protection against concurrent duplicate bootstrap; documented setup and recovery
+3, 5, 9
+#
+Rule
+Status
+Approved rule
+R1
+Frozen accounts
+Approved
+FROZEN accounts cannot send, receive or be funded; enforced in the backend service layer, not only the UI
+R2
+Rejected applications
+Approved
+A rejection is terminal; the customer may submit a new application, with audit history and protection against duplicate active applications
+R3
+Registration and login
+Approved
+Registration does not sign the user in; the user signs in on the login page
+0.1 Blueprint corrections C1 to C9 (approved 17 Oct 2026)
+These corrections close gaps found in the v2 review. They do not change D1 to D9 or R1 to R3. The items they left open (O1 to O3) and the wording choices they made (I1 to I7) were resolved on 17 Oct 2026 (section 0.2).
+#
+Correction
+Sections changed
+C1
+Customer navigation: Accounts list and History index routes added, with controller, service, authorization and view contracts
+6.2, 7, 7.1, 8, 9, 12.4
+C2
+Transaction-history REST endpoint approved, with a full contract
+2.4, 5, 6.4, 7, 7.1, 8, 9, 10
+C3
+Section 12.4 states that D8 is approved
+12.4
+C4
+Concurrency-safe database-backed account number sequence
+3, 3.3, 9, 12.2
+C5
+User statuses ACTIVE, LOCKED and DISABLED with transitions and effects on login and sessions
+3, 3.2, 5, 7, 9
+C6
+Funding-event lifecycle, immutability and failure handling
+3, 3.4, 4, 9
+C7
+Separate least-privilege application and migration database accounts
+2.3, 3, 3.1, 5, 9
+C8
+Profile-aware Secure cookie flag
+5, 5.1, 9
+C9
+NetBeans compatibility and Mockito added to the fixed constraints and checklist
+2.2, 2.3, 8, 9, 13
+0.2 Resolution of open items and interpretations (approved 17 Oct 2026)
+#
+Resolution
+Sections changed
+O1
+Admin password change. CUSTOMER and ADMIN both use one password-change function at /password; profile editing stays customer-only. A user with must_change_password set may use only the password-change workflow, logout and their supporting endpoints, enforced on the server.
+3, 3.2, 5, 5.2, 7, 7.1, 8, 9, 12.4
+O2
+Role-change auditing. "Role changes" removed from the v1 audit list; the roles CUSTOMER and ADMIN are fixed at creation and v1 has no role-change feature.
+5, 8
+O3
+Funding corrections. Reversals and corrections are out of scope for v1; a posted funding event and its ledger entry are never edited or deleted. The limitation and a controlled escalation and recovery procedure are documented, with no correction feature.
+3.4, 3.5, 8, 9
+I1
+SameSite=Lax on every profile (confirmed).
+5, 5.1
+I2
+/transactions lists the customer's accounts with a link to each account's history; no combined cross-account history in v1 (confirmed).
+7, 7.1
+I3
+must_change_password column on app_user (confirmed).
+3, 5.2
+I4
+An admin cannot lock or disable their own user or the last ACTIVE admin; admin disable and enable actions exist and are audited (confirmed).
+3.2, 7
+I5
+Failed transfer records and failure audits are written in a separate transaction after the financial transaction rolls back (confirmed).
+4
+I6
+An idempotency key reused with a different payload is rejected with a conflict response, for transfers and for funding (confirmed; the transfer case is now written into section 4).
+3.4, 4
+I7
+User status does not change account status; freezing accounts remains the control that stops account activity (confirmed).
+3.2
+I8
+Password reuse. A new password must differ from the user's current password, including in the forced password-change workflow, for both CUSTOMER and ADMIN. Approved and final. It is enforced in the service layer, not only in the form (approved 17 Oct 2026).
+5.2, 7, 8, 9
+N1
+Password-change throttling. Incorrect current-password attempts on POST /password count toward the shared request throttle and toward a separate endpoint-specific limit (default 5 per user in 15 minutes, configurable). The endpoint limit never changes the user's status or locks the account, is enforced on the server, returns a friendly non-sensitive response, logs no secrets, is audited, and is reset by a successful change. Login lockout is unchanged.
+5, 5.2, 7, 8, 9, 11, 13
+N2
+Missing routes assigned to phases. The public landing page (/) is built in Phase 2. The CUSTOMER profile page (/profile) is built in Phase 3, with its navigation entry shown only then and only to CUSTOMERs; an ADMIN is refused. The /accounts and /transactions contracts are unchanged.
+7, 9, 15
+1. Goals and non-goals
+Goals
+• A complete, working retail-banking simulation: registration, login, accounts, transfers, history, statements, and an admin console.
+• Every screen shows real data from MySQL. No hardcoded balances, no fake transactions, no dead buttons.
+• A security- and integrity-first design that can be defended in an interview or code review.
+Non-goals
+• Real money, real KYC, real payment rails, real email/SMS delivery.
+• A separate JavaScript frontend application.
+• Microservices.
+2. Architecture
+2.1 Style
+A server-rendered Spring MVC monolith. Controllers handle page requests, call services, put view models on the Model, and return a JSP view name. JSPs only render. Business rules live in service classes and nowhere else.
+Browser
+  -> Spring Security filter chain (session, CSRF, authN/authZ, headers)
+  -> Spring MVC controller (binding, validation, flash messages)
+  -> Service layer (business rules, @Transactional, ownership checks)
+  -> Spring Data JPA repositories (Hibernate)
+  -> MySQL 8 (constraints, Flyway-managed schema)
+  <- Controller adds view model -> JSP + JSTL + EL -> HTML
+REST endpoints exist only where they clearly help interactivity (section 6.4). They reuse the same services and the same security rules.
+2.2 Technology baseline
+Concern
+Choice
+Notes
+Language
+Java 21
+Supported by Boot 3.5.
+Framework
+Spring Boot 3.5.x (see D1)
+Final free patch release of 3.x was 3.5.16 per public reporting (UNVERIFIED until Phase 0); pin exact versions.
+Web
+Spring MVC + JSP 3.1, JSTL (Jakarta), EL
+No Thymeleaf, no scriptlets.
+Security
+Spring Security 6.x
+Form login, CSRF, method security.
+Persistence
+Spring Data JPA, Hibernate (version managed by the Boot BOM)
+
+Database
+MySQL 8
+CHECK constraints are enforced from 8.0.16 onward.
+Migrations
+Flyway with the MySQL module
+Schema changes only through versioned migrations.
+Build
+Maven
+WAR packaging.
+Runtime
+Tomcat 10.1 (Servlet 6.0, JSP 3.1, Jakarta namespace)
+Standalone deployment plus embedded Tomcat for development and tests.
+Frontend
+HTML5, CSS3, vanilla JavaScript
+No framework, no build toolchain required.
+Tooling (C9)
+NetBeans-compatible Maven project
+Standard Maven layout and a WAR that deploys to an external Tomcat 10.1 configured in NetBeans; no IDE-specific plugin is required and no IDE metadata is committed. The command-line Maven build is the reference build. NetBeans and Tomcat 10.1 compatibility is checked in Phase 0 (manual-only check).
+Testing (C9)
+JUnit 5, Mockito, Spring Boot Test, Spring Security Test, MockMvc, Testcontainers
+Mockito is used for collaborators in service unit tests; versions come from the Boot BOM and are pinned.
+Version numbers are proposals until Phase 0 proves them.
+Fixed constraints (C9). Java 21; Spring Boot 3.x; Spring MVC; JSP, JSTL and EL with no scriptlets; HTML5, CSS3 and vanilla JavaScript; Spring Security; Spring Data JPA and Hibernate; MySQL 8; Maven; Flyway; WAR packaging; external Tomcat 10.1; NetBeans compatibility; JUnit 5, Mockito, Spring Boot Test, MockMvc and Testcontainers where practical. No React, Angular, Vue, Thymeleaf, JSF, separate JavaScript backend or microservices unless explicitly approved.
+Support status (D1, as of 17 Oct 2026, from public reporting; Phase 0 re-verifies it). UNVERIFIED: every date, version number and support claim in this paragraph comes from public reporting and has not been checked against the official Spring support pages; Phase 0 must verify each one before any pin is final. Spring Boot 3.5 reached the end of its open-source support on 30 June 2026, and 3.5.16 is reported as the last free release. Spring Framework 6.2 and Spring Security 6.5 ended the same day. Paid extended support exists for 3.5. Boot 4.0's open-source window is reported to end in December 2026, and 4.1 was released in June 2026. Staying on 3.5.x means no free security patches for Boot or its managed dependencies, so SecureBank is deployed only on a private or local Tomcat with fictional data. The Phase 0 upgrade-path note names the 4.x target and its servlet baseline.
+2.3 JSP-compatible WAR packaging (verified in Phase 0, not assumed)
+JSP does not render reliably from an executable JAR, so the project is packaged as a WAR from the first commit.
+Planned configuration, each item to be confirmed by the Phase 0 spike:
+• <packaging>war</packaging> in the POM.
+• Main class extends SpringBootServletInitializer, so the same WAR deploys to standalone Tomcat 10.1.
+• spring-boot-starter-tomcat scoped provided for the standalone WAR, with a documented way to run embedded Tomcat locally (spring-boot:run or the executable WAR) that includes tomcat-embed-jasper.
+• JSTL implementation for the Jakarta namespace only. No javax.* JSP or servlet artifacts anywhere in the dependency tree.
+• JSP files under src/main/webapp/WEB-INF/views/ so they can never be requested directly; view prefix and suffix set in configuration.
+• Reusable layout through JSP tag files in WEB-INF/tags/ (the replacement for template fragments).
+• Static assets under a dedicated path with cache-friendly names.
+Phase 0 compatibility proof (must pass before any feature work):
+1. mvn dependency:tree shows no javax.servlet, javax.servlet.jsp, or mixed JSTL artifacts.
+2. A "hello" JSP using EL and a JSTL c:forEach and c:out renders correctly under spring-boot:run.
+3. The same WAR deployed to a clean standalone Tomcat 10.1 renders the same page.
+4. Flyway applies the migrations to MySQL 8 using the separate migration account (3.1): as a separate command in the production profile, and at startup in dev and test only; the runtime application runs with the least-privilege application account in both modes.
+5. An integration test fetches the rendered JSP over real HTTP (see 8.2) and asserts on the HTML.
+6. A short written note records what a Boot 4 + Tomcat 11 move would change (D1).
+7. The project opens, builds and deploys to the configured Tomcat 10.1 from NetBeans, and the command-line Maven build produces the same WAR (C9). The NetBeans part is a manual-only check and is reported as such.
+The Phase 0 proof page (/phase0/proof) is a spike artifact: served only under the dev and test profiles, never under a production profile, not a product route and not part of the section 7 inventory (see N4 in section 13).
+2.4 Package layout
+com.securebank
+  config/      security, MVC, session, Flyway/JPA settings (shared)
+  common/      Money type, error types, correlation ID, audit writer
+  user/        registration, profile, lockout (web, service, repository, domain)
+  account/     open, approve, freeze, close, account-number sequence allocation (3.3)
+  ledger/      append-only entries, balance posting
+  transfer/    transfers, idempotency, transfer history
+  admin/       approvals, funding, reconciliation, audit viewer
+  web/api/     the one approved REST controller (C2) and its JSON error advice
+Each feature package holds its own controllers, services, repositories and entities, mirroring the reference project's service boundaries as in-process packages instead of network services. Dependencies point one way: transfer uses ledger, ledger uses account, admin calls the services of the others, and user depends on none. An architecture test added in Phase 0 fails the build on package cycles or on a controller that calls a repository.
+Rules enforced in review: no entity is bound directly from a request (form DTOs only); no repository is called from a controller; no JSP contains logic beyond rendering and simple JSTL conditionals.
+3. Data model (Flyway-managed)
+All money columns are BIGINT minor units (paise); the currency is always INR, so no currency column exists. All tables use created_at; mutable tables also use updated_at and a version column.
+Money rules (D3). Amounts are stored and calculated as whole paise in a 64-bit integer, and floating-point types are never used for money. User input is parsed from text as a decimal with at most two fractional digits (a third digit is rejected, never rounded), converted exactly to paise and bounded by a maximum so arithmetic cannot overflow. Display uses the ₹ symbol, two decimals and Indian digit grouping (for example ₹1,23,456.78), produced by one shared helper. CSV exports use a plain decimal with no symbol or grouping. Balance, transfer and funding calculations are integer addition and subtraction only, so no rounding occurs.
+Table
+Purpose
+Key constraints
+app_user
+Login identity
+Unique username and email; password hash only; status ACTIVE, LOCKED or DISABLED with a CHECK (3.2); failed-attempt counter; nullable lock-until timestamp; must_change_password flag, default false, set only by the bootstrap and recovery path (D9) and cleared by the password change (5.2).
+user_role
+Role assignment
+Foreign key to app_user; role from a fixed set; a user holds exactly one role (CUSTOMER or ADMIN) in v1.
+customer_profile
+Fictional customer details
+One-to-one with app_user.
+account
+A bank account
+Unique account number allocated from number_sequence (3.3); owner foreign key; status (PENDING, ACTIVE, FROZEN, CLOSED, REJECTED); type SAVINGS or CURRENT; opens at zero balance; a nullable pending_slot with UNIQUE (owner, type, pending_slot) allows at most one PENDING application per type; balance_minor with CHECK (balance_minor >= 0); version.
+transfer
+A requested movement of funds
+From and to accounts; amount CHECK > 0; CHECK (from_account <> to_account); status; unique (initiator_user_id, idempotency_key).
+ledger_entry
+Append-only record of every balance change
+Links to account and transfer or funding_event (exactly one source per entry, enforced by a CHECK); direction; amount; balance_after_minor; immutable by design.
+funding_event
+Admin issuance of simulated funds
+Insert-only: a row exists only for a posted funding (3.4). Admin user, target account, amount CHECK > 0, mandatory reason; unique funding reference; unique (admin_user_id, idempotency_key); exactly one ledger entry (ledger_entry.funding_event_id is unique); no status column; no UPDATE or DELETE privilege for the application account.
+audit_log
+Security and business audit trail
+Actor, action, target, outcome, IP, correlation ID, timestamp. Append-only.
+account_status_history
+Append-only record of every account lifecycle change
+Account foreign key; from and to status; actor; reason; timestamp; immutable. Keeps every rejection when a customer re-applies.
+system_state
+One-time setup markers
+Unique key; an insert-once row named admin_bootstrap makes concurrent duplicate bootstrap impossible.
+number_sequence
+Account number counter (C4)
+One row per named sequence (account_number); next-value BIGINT; version; the initial row is reference data inserted by a migration; advanced only under a row lock inside the creating transaction (3.3).
+Integrity rules
+• The runtime application account has no UPDATE or DELETE privilege on ledger_entry, audit_log, account_status_history or funding_event, and no DDL privilege at all (3.1); triggers add defense in depth. Corrections are new compensating entries, never edits.
+• Invariant checked by tests and by an admin reconciliation view: for every account, balance equals the sum of its ledger entries; total funds change only through funding_event.
+• No seed data in migrations except reference data. Demo data is created through the same services as real usage (a clearly labeled dev-only command), so it is never fabricated rows.
+Balance write rule (D7). An account balance changes only through the ledger-posting service, as a delta applied inside a row lock together with its ledger entry. No endpoint, form or admin screen can set a balance directly, and the account entity exposes no public balance setter. The ledger is the authoritative record of posted financial changes; the stored balance is a constraint-guarded figure that is reconciled against it.
+Account lifecycle (D6). Accounts are created PENDING at zero balance. Only ACTIVE accounts can send transfers, receive transfers or receive funding. FROZEN accounts can do none of these, and this is enforced in the service layer for transfers and funding, not only in the UI (R1). CLOSED and REJECTED are terminal. After a rejection the customer may submit a new application; each rejection and its reason stay in the status history, and at most one PENDING application per account type exists at a time (R2).
+From
+To
+Who
+Condition
+(new)
+PENDING
+Customer
+Customer requests an account of an allowed type
+PENDING
+ACTIVE
+Admin
+Approval, audited
+PENDING
+REJECTED
+Admin
+Mandatory reason, audited
+ACTIVE
+FROZEN
+Admin
+Mandatory reason, audited
+FROZEN
+ACTIVE
+Admin
+Mandatory reason, audited
+ACTIVE
+CLOSED
+Owner
+Balance exactly zero, with confirmation
+3.1 Database accounts (C7)
+Two database accounts exist, and the runtime application never holds the migration account.
+Account
+Used by
+Privileges
+Credentials
+securebank_app
+The running application on Tomcat
+SELECT, INSERT and UPDATE on the mutable tables (app_user, customer_profile, account, transfer, number_sequence); SELECT and INSERT only on user_role, ledger_entry, audit_log, account_status_history, funding_event and system_state; no DELETE on any table; no DDL, GRANT or administrative privilege.
+Supplied to the application only, through environment or external configuration; never in the repository or the WAR.
+securebank_migrate
+Flyway only
+DDL and the DML Flyway needs, on the SecureBank schema only (tables, constraints, indexes, triggers, reference data).
+Never in the repository or the WAR. Supplied to the migration step only, through the environment or a CI or deployment secret store. In production it is not present in the Tomcat runtime environment, and it is rotated by the operator.
+Rules. In the production profile Flyway is disabled in the application (spring.flyway.enabled=false) and Hibernate runs with ddl-auto set to validate; migrations are applied by the operator as a separate step using the migration account. Dev and test profiles may run Flyway at startup against local throwaway databases using local-only credentials that are never reused elsewhere. Creating the two database accounts and their grants is a documented setup step outside the Flyway migrations (Phase 0 provides it for development, Phase 8 documents it for deployment). A Phase 1 test proves the application account is refused UPDATE and DELETE on the append-only tables and refused any DDL.
+3.2 User status (C5)
+Status
+Meaning
+Sign-in
+Existing sessions
+ACTIVE
+Normal user
+Credentials are checked as usual.
+Unaffected.
+LOCKED
+Temporary: set automatically after 5 failed attempts, with a lock-until time 15 minutes ahead. Administrative: set by an admin, with no lock-until time, until an admin unlocks it.
+Refused before the credential check, so a correct password does not bypass the lock. A temporary lock shows the lockout message from section 7; an administrative lock shows the same generic sign-in failure as a wrong password. Attempts on a locked user do not extend the lock.
+All of the user's sessions are invalidated when the status becomes LOCKED.
+DISABLED
+Switched off by an admin until an admin enables it; the user and their accounts are kept for the audit trail.
+Refused with the same generic sign-in failure as a wrong password; the status is never revealed to the caller.
+All of the user's sessions are invalidated when the status becomes DISABLED.
+From
+To
+Who
+Condition
+(new)
+ACTIVE
+System
+Registration, or first-administrator bootstrap (D9); audited
+ACTIVE
+LOCKED
+System
+Failed-attempt threshold reached; lock-until set; audited
+ACTIVE
+LOCKED
+Admin
+Mandatory reason; lock-until left empty; audited
+LOCKED
+ACTIVE
+System
+First sign-in attempt after the lock-until time has passed; the counter resets; audited. Applies only to temporary locks
+LOCKED
+ACTIVE
+Admin
+Unlock with mandatory reason; the counter resets; audited
+ACTIVE or LOCKED
+DISABLED
+Admin
+Mandatory reason; audited
+DISABLED
+ACTIVE
+Admin
+Enable with mandatory reason; the counter resets; audited
+All other transitions are forbidden, including DISABLED to LOCKED, and every forbidden attempt is refused in the service layer and audited. Users cannot change their own status. An admin cannot lock or disable their own user or the last ACTIVE admin. The security filter re-reads the user's status from the database on every authenticated request, so a session that survives an invalidation (for example after a restart) still ends at its next request. A user whose must_change_password flag is set is limited by the server to the password-change workflow, logout and their supporting endpoints (5.2) until the password is changed (D9). User status does not change the status of the user's accounts: an ACTIVE account of a LOCKED or DISABLED user can still receive transfers, and an admin freeze (R1) is the control that stops that.
+3.3 Account number sequence (C4)
+• Account numbers come from the number_sequence table. The creating transaction reads the account_number row with a pessimistic write lock (SELECT ... FOR UPDATE), uses the next value, advances it by one and inserts the account, all in one transaction, so two concurrent applications can never receive the same number.
+• The number is a configured numeric prefix plus the zero-padded sequence value; the exact length and any check digit are fixed in Phase 1 as configuration.
+• A UNIQUE index on account.account_number is the final guard.
+• Forbidden: count-then-increment, maximum-plus-one, an in-memory or per-instance counter, a random number without a uniqueness guard, and reusing the auto-increment primary key as the number.
+• The number is allocated when the application is submitted (status PENDING), so a rejected application consumes its number; gaps are acceptable and numbers are never reused.
+• Only the account package allocates numbers. A concurrency test (Phase 3) creates many accounts at once and asserts distinct numbers.
+3.4 Funding-event lifecycle (C6)
+A funding_event row exists only for a funding that was posted, so the table holds one persisted state, POSTED, and has no status column. Failed and cancelled attempts persist no funding_event row and create no ledger entry.
+Outcome
+What is persisted
+Balance effect
+Posted
+One funding_event, one ledger entry (balance_after_minor recorded) and the audit record, inserted in one transaction together with the balance delta under the row lock
+Exactly the funded amount, once
+Failed (validation, target not ACTIVE, over the per-event maximum, lock timeout, any exception)
+Nothing from the money transaction: it rolls back completely. The failure is then written to audit_log in a separate transaction
+None
+Cancelled (the admin leaves the confirm step or declines the dialog)
+Nothing; no request is submitted
+None
+Replay with the same admin and idempotency key
+Nothing new. The original funding_event is returned. If the same key arrives with a different target or amount, it is refused with a conflict response (HTTP 409 and a form error), and the refusal is audited
+None
+Transitions: none. A posted funding event is final. Its financial details (admin, target account, amount, reason, reference) and its ledger relationship are immutable: the application account has no UPDATE or DELETE privilege on funding_event and ledger_entry, a trigger rejects any update or delete as defense in depth, and the entity has no setters. An attempt that failed leaves nothing behind, so the same form can be submitted again with a new idempotency key. Reversing or correcting a posted funding event is not part of v1 (3.5).
+3.5 Funding corrections are out of scope for v1 (O3)
+Limitation. v1 has no reversal, clawback or correction of a funding event, and no screen, API, service method or script in the application edits or deletes a funding_event or ledger_entry row. A mistaken funding stays posted: the funded amount remains in the account and v1 cannot take it back. The reconciliation view still passes, because the posted event and its ledger entry are consistent; the mistake is a business error, not an integrity error. Corrections are not introduced as a feature without a new approval.
+Prevention (already in the design). The admin confirm step, the mandatory reason, the per-event maximum, the unique funding reference and the audit trail reduce the chance of a mistaken funding and make it traceable.
+Controlled escalation and recovery procedure (documented in the Phase 8 runbook; a manual operating procedure, not an application feature).
+• Record. The admin who notices the mistake writes down the funding reference, account number, amount and what was wrong, and reports it to the system owner.
+• Contain. An admin may freeze the target account with a reason, using the existing freeze action (R1), so the account neither sends nor receives while the owner decides.
+• Decide. The system owner chooses between restoring the database from a backup taken before the funding, rebuilding the demonstration database (the data is fictional), or accepting and documenting the funding as an incident note.
+• Recover. Recovery is a restore or rebuild performed by the system owner outside the application. Rows in ledger_entry or funding_event are never edited or deleted, not even by the database owner, and a restore replaces the whole database rather than altering history.
+• Close. The account is unfrozen through the normal admin action with a reason, and the incident note is kept with the audit records.
+4. Financial operation design
+Transaction boundary. One @Transactional service method per money movement. Controllers never open transactions.
+Concurrency protection.
+• Lock both account rows with pessimistic write locks, always in ascending account-ID order to prevent deadlocks.
+• @Version stays on account as a second line of defense; a conflict surfaces as a handled, retry-safe error.
+• Phase 4 includes a concurrent-transfer test (many simultaneous transfers on overlapping accounts) that asserts no negative balance, no lost update, and conserved total.
+Idempotency. The transfer form carries a server-issued idempotency key. A repeat submission (double click, refresh, back button) with the same key returns the original outcome and never moves money twice. The database unique constraint is the final guard. The same key arriving with a different payload (source, destination or amount) is rejected with a conflict response (HTTP 409 and a form error) and audited; it never returns another request's outcome. The stored transfer, including a FAILED one, is the record the new request is compared against.
+Transfer state machine. PENDING (inside the money transaction only) -> COMPLETED, or FAILED with the reason recorded by the separate failure-record transaction described under Auditability. A repeat of a failed submission returns the failed outcome; a retry uses a new form, which carries a new idempotency key. Insufficient funds, frozen or closed accounts, and self-transfer are rejected in the service, and again by database constraints where expressible.
+Rules enforced in the service. Ownership of the source account; source and destination accounts are both ACTIVE (a pending, frozen, closed, rejected or unknown destination all return the same generic recipient-unavailable message); amount positive and within configured limits; per-transaction and daily limits (simulated); consistent rounding (none needed with integer minor units).
+Auditability. Every completed transfer writes its ledger entries and an audit event in the same transaction. A failed attempt rolls back every balance change; its FAILED transfer record and its audit event are then written in a separate transaction (REQUIRES_NEW), so a failure record can never carry or hide a balance change.
+Funding events (D7). Customers cannot deposit or withdraw. Money enters the system only through an administrator funding event, one @Transactional service method that requires the ADMIN role (URL rule plus method security) and a valid CSRF token. It checks the idempotency key and the unique funding reference, locks the target account row and requires status ACTIVE. It then inserts the funding event and its ledger entry with balance_after_minor, applies the amount as a delta inside the lock, and writes the audit record in the same transaction. The amount must be positive and within a configured per-event maximum, and a reason is mandatory. A replay with the same key returns the original event. Any failure rolls back everything, creates no funding_event row, and is audited in a separate transaction. States and transitions are defined in 3.4.
+No silent overwrites. Only the ledger-posting service in the ledger package changes a balance. An architecture test fails the build on any other write path, and the reconciliation check (balance equals the sum of ledger entries) runs in tests and in the admin console.
+5. Security design
+Area
+Design
+Authentication
+Spring Security form login. Passwords hashed with a delegating encoder using bcrypt. Password policy enforced server-side. Generic login errors to avoid user enumeration. User status (3.2) is enforced at sign-in and on every authenticated request.
+Brute force
+Failed-attempt counter and temporary lockout per account (the LOCKED status with a lock-until time, 3.2), plus basic request throttling on login and registration, and on incorrect current-password attempts at /password, where the endpoint-specific limit never locks the account (5.2).
+Sessions
+New session ID on login (fixation protection); HttpOnly and SameSite=Lax on every profile, Secure profile-aware (5.1); idle timeout; logout invalidates the session; a user who becomes LOCKED or DISABLED loses all sessions (3.2); optional limit on concurrent sessions.
+CSRF
+Enabled for every state-changing request. Every form includes the token. Any fetch call sends it in a header.
+Authorization
+URL rules for coarse access (/admin/** requires ADMIN); method security on services for fine-grained rules.
+Object-level ownership
+Every customer-facing query is scoped by the authenticated user (for example findByIdAndOwnerId). A resource that is not yours returns 404, not 403, so existence is not revealed. A dedicated test matrix attempts cross-user access on every endpoint.
+Output escaping
+All dynamic output through c:out or fn:escapeXml. No raw ${} inside script blocks or inline event handlers; data for scripts goes through escaped data- attributes.
+Input validation
+Bean Validation on form DTOs, enforced server-side. Client-side checks are usability only. Mass assignment prevented by DTOs.
+Headers
+Content-Security-Policy that disallows inline script, X-Content-Type-Options, frame protection, referrer policy, HSTS in deployment. All JavaScript lives in external files to make this possible.
+Error handling
+A central controller advice maps exceptions to friendly pages. No stack traces or SQL in responses. Each error shows a correlation ID that matches the server log.
+Redirects and exports
+Redirect targets validated against an allow-list. CSV exports neutralize leading formula characters.
+Secrets and config
+Database credentials and secrets come from environment or external config, never from the repository. The running application receives only the least-privilege application account; migration credentials go only to the migration step (3.1).
+Audit
+Login success and failure, lockouts, password changes, transfers, admin actions (including user status changes) and account lifecycle changes are logged to audit_log. Roles are fixed at creation (D2); v1 has no role-change feature and records no role-change events.
+Administrative actions
+Approvals, freezes and funding require the ADMIN role through both URL rules and method security. Each needs a CSRF token and a mandatory reason, funding also needs an idempotency key, and every outcome including denials is audited. Admins cannot own customer accounts, so they cannot fund themselves (D2).
+Initial administrator (D9)
+A startup runner creates the first admin only when none exists, from environment-supplied credentials, and forces a password change at first login. No default credentials exist in the repository. A one-time database row with a unique key makes concurrent duplicate bootstrap impossible. Passwords are never hardcoded or logged. A documented recovery procedure for a lost admin runs only when no enabled admin exists, uses the same environment path, and is audited.
+MFA readiness (D4)
+MFA is not implemented in v1 and is never described as implemented. Authentication runs through one configurable provider and success-handler chain, so a second factor can be added later without reworking sessions or the user table.
+History API (C2)
+One read-only endpoint, GET /api/accounts/{id}/transactions, behind the same session and filter chain as the pages: authentication required, CUSTOMER role, owner-scoped lookup with 404 for any other account, server-side size and page limits, validated parameters, JSON errors with a correlation ID. Full contract in 6.4.
+Secure cookie (C8)
+Profile-aware: required in production, relaxed only in the explicitly selected dev profile (5.1).
+Forced password change (O1, D9)
+A server-side filter limits a user whose must_change_password flag is set to the password-change workflow, logout and their supporting endpoints; the rule is enforced on every request and not only in the navigation (5.2).
+5.1 Cookie and transport settings by profile (C8)
+Profile
+Where it runs
+Secure cookie
+Other settings
+prod (also the behavior when no profile is set)
+HTTPS deployments only
+Secure is required and set to true.
+HSTS on; HttpOnly and SameSite=Lax on; a startup guard refuses to start if prod is active and Secure is off. TLS ends at Tomcat or at a reverse proxy; behind a proxy Tomcat must trust the forwarded headers so the application sees HTTPS (documented in the Phase 8 runbook).
+dev
+A developer machine on http://localhost, selected explicitly (for example in the NetBeans run configuration or with -Dspring.profiles.active=dev)
+Secure may be switched off, because plain-HTTP localhost cannot carry it reliably in every browser.
+HttpOnly and SameSite stay on; HSTS off; the application logs a visible warning at startup that the dev cookie relaxation is active; never used for a deployment.
+test
+Automated tests
+Set per test.
+Tests assert the prod and dev behavior (section 8).
+The dev relaxations live only in the dev profile settings. Production settings are never weakened to make local development work.
+5.2 Forced password change gate (O1)
+• One password-change function, /password, serves both roles. Profile editing (/profile) stays customer-only, and an admin has no profile page.
+• The gate is a server-side filter in the Spring Security chain, after authentication. On every authenticated request it reads must_change_password together with the user status (3.2) from the database, so a session opened before the flag was set is gated at its next request.
+• While the flag is set, only the requests in the table below are allowed. Browser page requests to anything else receive a redirect to /password; any other method, and every /api/** call, receives 403 with the code PASSWORD_CHANGE_REQUIRED and no redirect. Refusals are logged with the correlation ID.
+Request while the flag is set
+Allowed
+Why
+GET and POST /password
+Yes
+The only way to clear the flag; the form carries a CSRF token and re-renders with field errors on a wrong current password, a policy violation or a repeated old password, without redirecting, so there is no loop.
+POST /logout (with CSRF token)
+Yes
+The user can always sign out, so the gate can never trap a session.
+Static assets used by the password page and the layout (stylesheet, script and icon files)
+Yes
+Lets the password page render and lets its script load.
+/error and the 401, 403 and 404 pages
+Yes
+Error handling must work.
+Everything else, including /, /dashboard, /accounts/**, /transfers/**, /transactions, /profile, /admin/** and /api/**
+No
+Redirect to /password for page requests; 403 PASSWORD_CHANGE_REQUIRED for API and non-GET requests.
+• After a successful sign-in, the success handler sends a flagged user to /password. The layout tag file shows a flagged user only Change password and Sign out; this is a convenience, and the filter is the control.
+• The password change requires the current password, a new password that meets the password policy and differs from the current one (I8; enforced in PasswordService in the service layer, not only in the form, for the voluntary and the forced change and for both roles), and a matching confirmation. In one transaction it stores the new hash, clears must_change_password and writes the audit record; the same session then continues to the user's home page with a flash message.
+• The flag is set only by the first-administrator bootstrap and the lost-admin recovery path (D9). v1 has no admin-initiated password reset, so the flag is never set for a customer in normal operation, but the gate applies to any user who has it, and tests cover both roles.
+• Throttling of POST /password (N1). It is enforced on the server in the service layer and never relies on JavaScript.
+  - Every incorrect current-password attempt counts toward the shared request throttle (section 5, brute-force row) and toward an endpoint-specific limit held per authenticated user. Default: 5 incorrect attempts within 15 minutes, configurable through securebank.security.password-change.max-failures and securebank.security.password-change.window.
+  - When the limit is reached, further POST /password requests are refused with HTTP 429 and the friendly message "Too many attempts. Please wait a while and try again." until 15 minutes after the attempt that reached the limit. While the user is throttled the submitted current password is not checked at all, so a correct password does not bypass the throttle, and the response reveals nothing about password verification. Refused requests are not counted again, so they cannot extend the wait. GET /password still works.
+  - The throttle never changes the user's status to LOCKED, never ends a session, and does not affect sign-in, logout, the forced-change gate or any other page. Login-lockout behavior (3.2) is unchanged.
+  - An incorrect current password produces the generic form message "The password could not be changed. Check your details and try again.", with no detail about why verification failed. A policy violation or a reused password (I8) shows a field message about the new password and is not counted, because the current password was correct.
+  - A successful password change resets the user's counter.
+  - The counter is kept in memory by the application, per user and per instance, using no external rate-limiting dependency and no new table. It resets when the application restarts; this is accepted for the single-instance simulator, and the audit log is the durable record (section 11).
+  - Passwords, password hashes and submitted password fields are never logged or stored in audit rows: the form object excludes them from toString and a log-scrubbing test covers /password.
+  - Audit events, without secrets and with user id, IP, correlation ID and a reason code: PASSWORD_CHANGE_SUCCEEDED; PASSWORD_CHANGE_FAILED with reason CURRENT_PASSWORD_INCORRECT, REUSE or POLICY; PASSWORD_CHANGE_THROTTLED, written once when the limit is reached. Later refused requests in the same period are logged with the correlation ID but not audited, to avoid flooding the audit log.
+6. Frontend design
+6.1 Principles
+Polished, responsive, accessible, consistent. Mobile-first CSS with design tokens (color, spacing, type scale) in one stylesheet system. Target WCAG 2.2 AA: semantic landmarks, skip link, visible focus, labelled controls, sufficient contrast, keyboard operability, error summaries that receive focus, status messages in live regions, and no information conveyed by color alone.
+Simulator labeling. Every page carries a persistent footer reading: Educational banking simulator. Fictional customers and simulated funds. Not a real bank. The landing and registration pages say the same in their main content, and the README and every phase report repeat it.
+6.2 JSP structure
+• One layout tag file wraps every page (header, navigation, flash messages, footer).
+• Small tag files for repeated parts: form field with label and error, money display, status badge, pagination, empty state.
+• Money is formatted from minor units in one place.
+• Navigation entries come from the route inventory in section 7 (C1). An entry is added in the phase that builds its route, and no navigation link points to an unbuilt route; a test visits every navigation link for each role.
+6.3 UI states (required wherever relevant)
+State
+Implementation
+Loading
+Submit buttons disable and show progress on submit (prevents double submit); tables that fetch more rows show a busy indicator with aria-busy.
+Validation
+Server returns the form with field-level messages and an error summary; user input preserved except passwords.
+Success
+Post/Redirect/Get with a flash message, so refresh never resubmits.
+Empty
+Explicit, helpful empty states (for example, no transactions yet, with a clear next action).
+Error
+Friendly error page or inline error with correlation ID; failed transfers explain the reason in plain language.
+6.4 Where vanilla JavaScript and REST are justified
+• Progressive enhancement only. Every page works without JavaScript except the items below.
+• Submit-state handling and confirmation dialogs using the native dialog element.
+• Approved REST endpoint (C2): GET /api/accounts/{id}/transactions for a "load more" history table. It returns data the JSP-rendered table already shows, and it is the only /api route in v1; anything beyond it needs a new approval with a stated benefit. A destination-name lookup on the transfer form is deliberately not planned, because it enables account enumeration.
+• JSP and Spring MVC stay primary: the history page renders its first page on the server and works without JavaScript through ordinary previous and next links. An external script (no inline script) appends further pages through the endpoint.
+Aspect
+Contract
+Method and route
+GET /api/accounts/{id}/transactions. Read-only; no state changes.
+Authentication
+The same session cookie and security chain as the pages. An anonymous caller receives a 401 JSON response (no redirect to the login page); a LOCKED or DISABLED user receives 401.
+Authorization
+CUSTOMER role through the URL rule and method security; an ADMIN receives 403. The service loads the account with findByIdAndOwnerId; an account that is not the caller's and one that does not exist return the identical 404 body. Accounts of any status, including CLOSED, can be read.
+Pagination limits
+page: whole number, 0 or more, default 0. size: whole number from 1 to 50, default 20 (the history page size). Values outside the range are rejected with 400, never silently changed. Rows are ordered by posted time then id, descending, so pages are stable. The response says whether a next page exists, without a count query.
+Filters and validation
+The same filters and the same validator as the history page: from and to dates (from must not be after to), direction (CREDIT or DEBIT), and status. Unknown or malformed values return 400 with field-level detail. The account id must be a whole number.
+Response
+JSON with items, page, size and hasNext. Each item carries the same fields as the JSP row model and nothing more; amounts are given as integer paise plus a display string formatted by the shared money helper (D3).
+Errors
+A JSON body with status, code, message and correlationId, produced by an advice limited to the web.api package: VALIDATION_ERROR 400, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, METHOD_NOT_ALLOWED 405, TOO_MANY_REQUESTS 429 (shared request throttle), INTERNAL_ERROR 500. No stack trace, SQL or internal text; the correlation ID matches the server log and the X-Correlation-Id header.
+Response headers
+Content-Type application/json; Cache-Control no-store; X-Content-Type-Options nosniff. CSRF tokens are not needed because the call changes nothing.
+Client rules
+The script builds rows with textContent, never innerHTML; it reads no data from inline attributes beyond escaped data- attributes; it shows a loading state (aria-busy) and an error message with the correlation ID.
+7. Page and action inventory
+Every row below needs a defined behavior and at least one test before its phase is marked complete.
+Area
+Route(s)
+Who
+Key behavior
+Landing
+/
+Public
+Product summary that states clearly this is an educational banking simulator; links to login and register.
+Register
+/register
+Public
+Validated sign-up, duplicate handling, password policy, the new user is active immediately (D6) and signs in on the login page; no auto sign-in.
+Login / logout
+/login, /logout
+Public / authed
+Generic errors, lockout message and status effects (3.2), CSRF-protected logout; a user with must_change_password set is sent to /password and reaches only the password-change workflow, logout and their supporting endpoints until the password is changed (3.2, 5.2).
+Dashboard
+/dashboard
+Customer
+Real accounts and recent activity; empty state for new users; an account awaiting approval shows a PENDING badge and no transfer action; no deposit or withdraw action exists anywhere.
+Accounts
+/accounts
+Customer
+Lists every account the signed-in customer owns, in every status (PENDING with its badge, REJECTED with the recorded reason), each with type, account number, status and balance; links to the account detail and to Open account; designed empty state. Never shows another user's accounts.
+History index
+/transactions
+Customer
+Target of the History navigation entry. Lists the customer's accounts, each linking to that account's history; there is no combined cross-account ledger in v1; designed empty state when the customer has no account.
+Open account
+/accounts/new
+Customer
+Request an account of an allowed type (created PENDING at zero balance); confirmation explains it awaits admin approval; a second pending application of the same type is refused with a clear message, and after a rejection the customer may apply again.
+Account detail
+/accounts/{id}
+Owner
+Balance, status, recent ledger entries; Close action allowed only at zero balance, with confirmation.
+Transfer
+/transfers/new, confirm, result
+Owner
+Two-step confirm, idempotent submit, clear success and failure reasons; the source account must be ACTIVE; unavailable recipients return one generic message.
+History
+/accounts/{id}/transactions
+Owner
+Filters (date range, direction, status), pagination, load-more through the approved API (6.4), CSV export.
+Profile
+/profile
+Customer
+Update profile details (customer-only; an ADMIN receives 403 and has no profile page). Built in Phase 3, and its navigation entry appears only then. Password change is not on this page; a link leads to /password.
+Password change
+/password
+Customer and Admin
+Change password with a current-password check, policy and confirmation; the new password must differ from the current one (I8); audited; clears must_change_password. Incorrect current-password attempts are throttled per user without locking the account (5.2). The only function besides logout that a user with the flag can use (5.2).
+Admin users
+/admin/users
+Admin
+Search, view, lock, unlock, disable or enable (mandatory reason, audited), under the transitions and guards in 3.2.
+Admin approvals
+/admin/approvals
+Admin
+Queue of PENDING accounts; approve or reject with a reason; both outcomes audited and visible to the customer.
+Admin accounts
+/admin/accounts
+Admin
+Freeze or unfreeze with a mandatory reason; view status and balances.
+Admin funding
+/admin/funding
+Admin
+Form with target account number, amount, mandatory reason and idempotency key; confirm step; result shows the unique funding reference; only ACTIVE accounts accepted; list of past events.
+Admin audit
+/admin/audit
+Admin
+Filterable audit log.
+Admin reconciliation
+/admin/reconciliation
+Admin
+Balance-versus-ledger check results.
+Errors
+/error, 403, 404
+All
+Friendly pages with correlation ID.
+History API
+GET /api/accounts/{id}/transactions
+Customer (owner)
+Paginated JSON for the load-more control on the history page; read-only; contract in 6.4.
+Any navigation link, filter, or button not in this table is not built until it is added here.
+7.1 Contracts for the routes added by C1 and C2
+Route
+Controller
+Service
+Authorization
+View or output
+/accounts
+AccountController.list (GET)
+AccountService.listAccountsForOwner(userId), returning account summary view models, never entities
+Authenticated CUSTOMER by URL rule; the query is scoped by the authenticated user's id and takes no owner id from the request; ADMIN receives 403; anonymous is redirected to login
+WEB-INF/views/accounts/list.jsp using the layout, account-summary card, status badge, money and empty-state tag files; all output through c:out; only c:forEach and c:if logic
+/transactions
+TransactionHistoryController.index (GET)
+AccountService.listAccountsForOwner (reused; no new service)
+Same as /accounts
+WEB-INF/views/transactions/index.jsp: the customer's accounts with a link to each history page; empty-state tag file
+/api/accounts/{id}/transactions
+HistoryApiController in web/api (GET)
+TransactionHistoryService.pageForOwner(userId, accountId, filter, pageRequest), the same method the JSP history page calls (ledger package)
+/api/** requires CUSTOMER by URL rule; ownership through findByIdAndOwnerId; 404 for any account that is not the caller's; JSON 401 for anonymous
+JSON only, no JSP; consumed by an external script file; contract in 6.4
+/password
+PasswordController (GET and POST)
+PasswordService.changePassword(userId, currentPassword, newPassword), in one transaction with the audit record and the flag clear
+Any authenticated user by URL rule, whatever the role; CSRF token required; the only route besides POST /logout open to a user with must_change_password set (5.2); the user id comes from the session, never from the request
+WEB-INF/views/password/change.jsp using the layout, form-field and error-summary tag files; passwords are never echoed back; c:out for all output
+8. Test strategy
+8.1 Layers
+• Unit tests for services and the Money type (business rules, limits, state machine), with JUnit 5 and Mockito.
+• Repository and migration tests against a real MySQL 8 (Testcontainers; this needs Docker available on your machine, which is a prerequisite to confirm in Phase 0).
+• Web-layer tests with MockMvc and Spring Security Test (CSRF, roles, validation errors, redirects).
+• Rendered-page tests over real HTTP against embedded Tomcat, because MockMvc does not execute the JSP engine and cannot prove that a JSP actually renders.
+• Concurrency and idempotency tests for transfers (section 4).
+• Authorization matrix tests: every endpoint as anonymous, owner, other customer, and admin.
+• Accessibility checks: an automated scan on key pages plus a manual keyboard and screen-reader checklist per phase.
+• Funding and lifecycle tests. Admin-only access, unique reference and idempotent replay, atomic rollback on failure, funding refused for non-ACTIVE accounts, concurrent funding and transfers conserving totals, every account-status transition (allowed and forbidden), an architecture test that no other code path writes a balance, and a check that no customer deposit or withdraw route exists (the authorization matrix expects 404 or 405).
+• Money and role tests. Parsing rejects a third decimal, negatives, zero where not allowed, non-numeric text and over-limit amounts; display uses Indian grouping; CSV output is plain; a static check bans floating-point types in money code; an admin cannot open or own an account, and a user cannot hold both roles.
+• Bootstrap and application tests. Concurrent startups create exactly one admin; no password appears in logs; a second PENDING application of the same type is refused; re-application after a rejection is accepted and the history keeps both.
+• User status and session tests (C5). Every user-status transition, allowed and forbidden; sign-in results and messages for each status; a temporary lock clears at the first attempt after its time; locking or disabling a user ends an open session at once (two browsers) and a missed invalidation still ends it on the next request; the self-lock and last-admin guards; the must_change_password gate.
+• Account number tests (C4). Many concurrent account creations produce distinct numbers; the UNIQUE index rejects a forced duplicate; a static check finds no count-then-increment or maximum-plus-one code.
+• Funding lifecycle tests (C6). A posted event has exactly one ledger entry and the exact balance delta; a failure at each step leaves no funding_event row and no balance change and writes the failure audit in its own transaction; a replay returns the original event; the same key with a different payload is refused; no setter or update path exists.
+• Database privilege tests (C7). Under the application account, UPDATE and DELETE on ledger_entry, audit_log, account_status_history and funding_event are refused, DDL is refused, and the production configuration contains no migration credentials.
+• Profile and cookie tests (C8). The prod profile sets Secure on the session cookie and sends HSTS; startup fails if prod has Secure off; the dev profile behaves as documented; HttpOnly and SameSite are present in every profile.
+• History API tests (C2). Anonymous 401 JSON, ADMIN 403, another customer's account 404 identical to a missing account, owner 200; page and size at and beyond their limits, non-numeric values, bad date ranges and unknown directions return 400; stable ordering across pages; fields equal the JSP row model; error body carries the correlation ID; Cache-Control no-store.
+• Navigation tests (C1). For each role, every navigation link resolves to a route in section 7 and returns the expected status; the Accounts and History index routes pass the ownership matrix.
+• Tooling checks (C9). Service unit tests use Mockito; the command-line Maven build reproduces the WAR; the NetBeans build and deploy is a manual-only check and is labeled that way in the phase report.
+• Forced password change tests (O1, I8). For both a CUSTOMER and an ADMIN with the flag set: every route in section 7 other than /password and POST /logout is refused (redirect for page requests, 403 PASSWORD_CHANGE_REQUIRED for API and non-GET requests); a direct POST is refused without any navigation; /password renders with its assets; logout with a CSRF token works and does not loop; a wrong current password, a policy violation or reuse of the old password re-renders the form with no redirect loop; success clears the flag and the same session reaches its home page; a session opened before the flag was set is gated at its next request; the new password must differ from the current one; the change is audited.
+• Role and audit tests (O2). No endpoint or service changes a user's role, and no role-change audit event exists.
+• Funding correction absence tests (O3). An architecture test finds no service method, controller or script that updates or deletes funding_event or ledger_entry rows, and the authorization matrix finds no reversal or correction route (expected 404 or 405).
+• Idempotency conflict tests (I6). The same key with a different payload returns 409 for transfers and for funding, is audited, and never returns another request's outcome.
+• Password-change throttle tests (N1). Repeated incorrect current passwords return the generic form message and are counted by both the shared throttle and the endpoint limit; at the configured limit (default 5 in 15 minutes) the next POST /password returns 429 with the friendly message and does not check the password, even a correct one; the user's status stays ACTIVE and the user can still sign in, sign out and use other pages (no account lock); the throttle is per user, so another user is unaffected; the endpoint recovers when the window passes (tested with an injected clock); a successful change resets the counter; throttled and generic responses contain no password-verification detail; passwords, hashes and submitted password fields never appear in logs or audit rows (log-scrubbing test extended to /password); the audit events listed in 5.2 are written without secrets; login-lockout behavior is unchanged (regression test); the behavior is identical with JavaScript disabled.
+• Password reuse tests (I8). The service layer rejects a new password equal to the current one when called directly, bypassing the form, for a CUSTOMER and for an ADMIN, in the voluntary change and in the forced workflow; the rejection is audited without secrets, is not counted by the throttle and leaves must_change_password set; a different valid password succeeds and clears the flag.
+• Route phase tests (N2). The landing page / is public and renders in Phase 2; /profile returns 200 for a CUSTOMER, 403 for an ADMIN and a redirect to the login page for an anonymous user; the Profile navigation entry is absent before Phase 3, present afterwards for CUSTOMERs, and never shown to an ADMIN.
+8.2 Definition of "complete"
+A feature is reported complete only when its code has been inspected and its relevant automated tests pass, with the commands run and the results quoted in the phase report. Manual-only checks are labeled as such. Anything unverified is listed under remaining issues.
+9. Implementation phases
+One testable phase at a time. Each starts only after you approve the previous report.
+Phase
+Content
+Exit criteria
+0. Foundation and compatibility spike
+POM, WAR packaging, Tomcat 10.1 deploy, JSP/JSTL proof, Flyway baseline through the migration account, the two database accounts (3.1), dev, test and prod profile skeleton (5.1), NetBeans check, Testcontainers, build command, D1 version-status verification and upgrade-path note
+All seven checks in 2.3 pass (the NetBeans part is manual-only and labeled so).
+1. Schema and domain core
+Migrations (including number_sequence, the user-status CHECK and funding_event without a status column), entities, Money type with parse and format rules (D3), repositories, constraint tests, database privilege tests (3.1)
+Migrations apply cleanly; constraint tests prove the database rejects invalid data; privilege tests prove the application account cannot update or delete the append-only tables or run DDL.
+2. Authentication and base UI
+Layout, register, login, logout, lockout, session and CSRF config, error pages, audit of auth events, log-scrubbing test (no passwords in logs), ADMIN role and initial-admin bootstrap with concurrent-start protection (D2, D9), user statuses with their sign-in and session effects and the status-transition service (3.2; admin screens follow in Phase 6), the landing page (/), the /password page with its throttle (5.2), the server-side must_change_password gate (5.2), profile-aware cookie and transport settings (5.1)
+Auth and CSRF tests pass; pages render; accessibility checklist for these pages done; status, automatic-lock session and cookie-profile tests pass; forced-password-change tests pass for both roles; password-change throttle, password reuse and landing-page tests pass.
+3. Accounts and dashboard
+Open account (starts PENDING) with account-number allocation (3.3), minimal admin approval queue, dashboard, Accounts list (/accounts) and its navigation entry, profile page (/profile, CUSTOMER only) and its navigation entry, account detail with real data, zero-balance account closure
+Ownership matrix passes for these routes; empty states verified; every lifecycle transition (allowed and forbidden) tested; duplicate pending application blocked; re-application after rejection works; concurrent account creation yields distinct numbers; /profile is accessible to a CUSTOMER and refused to an ADMIN.
+4. Ledger and transfers
+Transfer service, locking, idempotency, ledger entries, UI, admin funding service with a minimal funding page (D7) following the lifecycle in 3.4, the idempotency-conflict responses (I6), and the Transfers navigation entry
+Concurrency, idempotency, and rollback tests pass; funding and funding-lifecycle tests pass; idempotency-conflict tests pass; the funding-correction absence test passes; balances reconcile to ledger.
+5. History and statements
+Filters, pagination, CSV export, History index (/transactions) and its navigation entry, load-more API (6.4)
+Filter and pagination tests pass; export escaping test passes; the API matrix and validation tests pass.
+6. Admin console
+Users (lock, unlock, disable, enable with the guards in 3.2), accounts (freeze), funding history and reports, audit viewer, reconciliation
+Admin-only access proven; every admin action audited and tested; admin lock and disable end open sessions (tested).
+7. Hardening and polish
+Headers and CSP, production-profile cookie and transport review (5.1), responsive pass, accessibility pass, error-path review, security review against section 5
+Checklist complete with evidence; no inline script remains.
+8. Packaging and deployment
+Production WAR, externalized config, separate migration step and database accounts (3.1), HTTPS and proxy setup (5.1), Tomcat 10.1 runbook including secure admin setup and recovery (D9) and the funding-correction escalation procedure (3.5)
+Clean-machine deploy succeeds and smoke tests pass.
+Phase dependency notes added by the corrections:
+• Phase 0 creates the two database accounts and the profile skeleton before any migration runs in Phase 1.
+• Phase 1 holds the number_sequence table and the user-status column; Phase 2 uses the status column; Phase 3 uses number_sequence.
+• The status-transition service is built in Phase 2 with automatic locking; admin lock, unlock, disable and enable screens arrive in Phase 6 and reuse that service.
+• Navigation entries are added with their routes: Accounts and Profile in Phase 3, Transfers in Phase 4, History in Phase 5; the Profile entry is shown to CUSTOMERs only.
+• The history service used by the history page (Phase 5) is the same one the API calls; the API is not built before the page.
+• The landing page (/) is built in Phase 2 and the profile page (/profile) in Phase 3; the Profile navigation entry appears only in Phase 3 and never for an ADMIN.
+• The password-change throttle (N1) is part of the Phase 2 /password work and needs only the audit writer and the shared request throttle that Phase 2 already builds.
+Phase report template
+Each phase ends with: files changed, tests run (exact commands), results (pass or fail counts), what was manually checked, remaining issues, and the proposed next phase.
+10. Reconciliation checklist (old blueprint versus approved architecture)
+Use this to purge anything that conflicts with the final decision:
+• Any Thymeleaf, React, Angular, or Vue reference is replaced by JSP, JSTL, and EL.
+• Any executable-JAR packaging assumption is replaced by WAR packaging with a Tomcat 10.1 target.
+• Any REST-first or SPA-style API is replaced by MVC controllers, with REST only for the single approved exception, GET /api/accounts/{id}/transactions (C2).
+• Any hardcoded balances, sample transactions, or placeholder buttons are removed.
+• Any scriptlet use is replaced by EL, JSTL, and tag files.
+• Any business logic in controllers or JSPs moves to services.
+• Any real payment or banking integration is removed.
+11. Risks and open items
+Risk
+Mitigation
+Spring Boot 3.x out of OSS support (D1)
+Pin versions, record risk, keep an upgrade-path note, reassess before any real exposure. This project handles simulated funds only.
+JSP and Boot packaging pitfalls
+Phase 0 spike gates all other work.
+JSP rendering not covered by MockMvc
+Real-HTTP rendered-page tests.
+Docker needed for Testcontainers
+Confirm in Phase 0; fall back to a local MySQL 8 test schema if unavailable.
+Concurrency bugs only appear under load
+Dedicated multi-threaded tests in Phase 4, repeated runs.
+Scope creep in UI
+Section 7 inventory is the contract.
+Admin funding used to mint money
+Mandatory reason, per-event maximum, unique reference, immutable audit trail, reconciliation view, and admins cannot own accounts.
+Migration credentials reaching the runtime application
+Separate accounts; migration credentials only in the migration step; privilege tests (3.1)
+Secure cookie weakened in production
+Production settings apply when no profile is set; startup guard; cookie tests (5.1)
+History API used to scrape data
+Owner-only, 404 on foreign ids, size capped at 50, shared throttle, read-only, no field beyond the page's own (6.4)
+NetBeans or Tomcat 10.1 incompatibility (unverified)
+Phase 0 manual check; the command-line Maven build is the reference build
+Forced-password-change gate trapping a user
+The allow-list includes the password page, logout and static assets; tests cover both roles, failed submissions and logout (5.2)
+Password-change throttle state lost on restart
+The counter is in memory per instance (5.2) and resets on restart; accepted for the single-instance simulator; the audit log keeps the durable record; a durable counter would need a new decision
+12. Reference Project Analysis and Adaptation Plan
+The uploaded project is a backend-only Spring Boot 2.7 microservices banking API with no user interface, so it informs SecureBank's domain rules and its list of mistakes to avoid, not its look, its architecture or its code.
+Every finding below comes from files extracted and read from the uploaded archive. Nothing was run, built or modified.
+• No frontend exists. The project source contains no JSP, HTML, CSS, JavaScript, image or template files. The only HTML in the archive is generated Javadoc under docs/, together with its bundled scripts, stylesheets and images. There is no dashboard, navigation, form or visual design to preserve.
+• Stack is older than the approved one. All seven modules use Spring Boot 2.7.14 or 2.7.15 with Spring Cloud 2021.0.8, Java 17 and javax.persistence imports. The approved Boot 3 / Jakarta stack is a migration away, and Boot 2.7 is itself long out of support.
+• Architecture is distributed. An API gateway, a Eureka registry, Keycloak, Feign clients and five MySQL databases, one per service. A single transfer touches three services over HTTP.
+• Money handling is unsafe. There is no @Transactional on any account, transfer or transaction service (the only @Transactional in the archive is on the non-financial UserServiceImpl), no locking, no @Version, no idempotency, and the three remote calls of a transfer can fail halfway and leave inconsistent balances.
+• Several business rules are broken or untested. Closing an account never saves the change, the status-update rule is inverted, and the only tests found are empty context-load tests.
+• Committed secrets. Keycloak client secrets and database root credentials sit in plain application.yml files. Their values are deliberately not reproduced in this document.
+• Useful domain ideas do exist. Account and user approval states, a reference ID tying a transfer to its ledger rows, account lifecycle states, and a clean service/controller/DTO split are worth carrying over in concept.
+12.1 What was inspected
+The archive holds 474 files (corrected from 699 after a recount from the ZIP). Of these, 311 are generated Javadoc and its legal files under docs/, and 163 are project files: 130 Java files, 8 Markdown files (the READMEs), 7 YAML files, 7 POMs, 7 .gitignore files, one properties file, one Maven wrapper JAR, one Dockerfile and one Postman collection. I read all configuration, every controller and service implementation of the five business modules, the gateway security class, the entities and the enums.
+Module
+Role
+Key facts verified in the files
+Data store
+API-Gateway
+Single entry point, JWT validation
+Spring Cloud Gateway on port 8080; only /api/users/register is public; CSRF disabled; duplicate route id for fund transfers
+None
+Service-Registry
+Eureka discovery server
+Port 8761; no security configured
+None
+User-Service
+Registration, profile, approval
+Creates a Keycloak user (disabled), saves a PENDING local user, admin approval enables login; BCrypt encoder bean defined but passwords go to Keycloak
+MySQL user_service
+Account-Service
+Account lifecycle
+Account number is a fixed prefix plus a 7-digit sequence; states PENDING, ACTIVE, BLOCKED, CLOSED; types SAVINGS_ACCOUNT, FIXED_DEPOSIT, LOAN_ACCOUNT
+MySQL account_service
+Fund-Transfer
+Internal transfers
+Reads both accounts over HTTP, updates both balances over HTTP, then writes ledger rows; statuses PENDING, PROCESSING, SUCCESS, FAILED
+MySQL fund_transfer_service
+Transaction-Service
+Transaction records, deposits, withdrawals
+Deposit and withdrawal adjust the balance through the account service, then save a transaction with a random reference ID
+MySQL transaction_service
+Sequence-Generator
+Account number counter
+Reads row 1, adds one, saves, with no locking
+MySQL sequence_generator
+The Postman collection lists 19 requests across these services and confirms the public API surface. The only Dockerfile is in User-Service and uses the deprecated openjdk:17-jdk base image. The other modules have no container or deployment configuration.
+12.2 Comparison with SecureBank requirements
+All rows are verified from the named files unless marked Assumption. Decisions: Reuse concept, Adapt, Rebuild, Reject.
+Reference finding
+Evidence or file location
+Relevance to SecureBank
+Decision
+Required adaptation
+No frontend of any kind
+No JSP, HTML, CSS or JS in any module; HTML only in generated docs/
+The task asks to preserve UI/UX ideas, but none exist
+Reject as a UI source
+Design the UI from scratch (12.4); do not claim any visual reuse
+Microservices with gateway, Eureka, Feign
+API-Gateway/application.yml, Service-Registry, external/*Service.java in each module
+Conflicts with the approved single WAR on Tomcat 10.1
+Reject architecture, reuse boundaries
+One monolith; keep the module split (user, account, ledger, transfer) as feature packages with service-to-service Java calls
+Spring Boot 2.7.14/2.7.15, Spring Cloud 2021.0.8, javax.persistence
+Every pom.xml; entity imports
+Wrong Jakarta namespace for Boot 3 and Tomcat 10.1
+Reject
+Start fresh on Boot 3.5.x with jakarta.*; copy no source files
+Keycloak for login and user store
+User-Service/KeycloakServiceImpl.java, gateway SecurityConfig.java
+Approved stack is Spring Security with JSP form login; Keycloak adds an external server
+Reject
+Local app_user table, delegating bcrypt encoder, session login
+Registration creates a disabled user; admin approval enables it
+UserServiceImpl.createUser, updateUserStatus; enum PENDING/APPROVED/DISABLED/REJECTED
+Good simulated-KYC workflow
+Adapt
+Apply approval to account opening (D6) and keep user statuses as ACTIVE/LOCKED/DISABLED
+Passwords logged in plain text
+UserController.java line 33 logs userDto.toString() and CreateUser is @Data with a password field
+Direct secret leak into logs
+Reject
+Form DTOs exclude secrets from toString; log-scrubbing test in Phase 2
+Gateway disables CSRF
+SecurityConfig.java
+Acceptable for stateless JWT APIs only; SecureBank uses cookie sessions
+Reject
+CSRF enabled for every state-changing request
+No ownership checks; any caller can read any account, user or transfer by ID
+AccountController (/accounts/{userId}, ?accountNumber=), UserController.readAllUsers, FundTransferController
+Core security requirement of SecureBank
+Reject
+Owner-scoped queries, 404 on foreign IDs, admin-only listings, matrix tests
+Update endpoints copy client fields onto entities, including balance
+AccountServiceImpl.updateAccount uses BeanUtils.copyProperties(accountDto, account); PUT /accounts is public inside the API
+Lets any caller set a balance; mass assignment
+Reject
+No balance-setting endpoint; balance changes only through ledger-posting services
+Transfer is three remote calls with no transaction, locks or idempotency
+FundTransferServiceImpl.fundTransfer and internalTransfer
+Exactly what the financial-integrity requirement forbids
+Rebuild
+Single local @Transactional posting with ordered row locks and idempotency key (section 4)
+Balance check then update (read, compare, write)
+FundTransferServiceImpl, TransactionServiceImpl.addTransaction
+Classic lost-update race
+Rebuild
+Locked reads, CHECK (balance >= 0), @Version
+Transfer reference ID links the transfer to its two ledger rows
+FundTransfer.transactionReference, Transaction.referenceId
+Good audit idea
+Reuse concept
+transfer_id foreign key on ledger_entry plus a public reference code
+Account number = prefix + sequence from a separate service, no unique constraint, unlocked counter
+AccountServiceImpl.createAccount, SequenceServiceImpl.create, Account.java
+Duplicates are possible under load
+Adapt
+number_sequence table advanced under a row lock inside the creating transaction (3.3), plus a UNIQUE index
+Account lifecycle states PENDING, ACTIVE, BLOCKED, CLOSED
+AccountStatus.java
+Matches approval and freeze needs
+Adapt
+PENDING, ACTIVE, FROZEN, CLOSED, transitions enforced in the service
+Close-account rule (balance must be zero) is right but never persisted
+AccountServiceImpl.closeAccount sets CLOSED with no save and no @Transactional; it also overwrites the message with the response code
+Shows the rule is worth keeping and the test coverage is missing
+Adapt rule, reject code
+Zero-balance closure in a transactional service with a test
+Status update logic is inverted and has a hard-coded Rs.1000 minimum
+AccountServiceImpl.updateStatus throws when the account is ACTIVE
+Would block activation behaviour as written
+Reject code
+Accounts open at zero balance with no minimum (customers cannot deposit), explicit state machine, tests for each transition
+Account types include FIXED_DEPOSIT and LOAN_ACCOUNT
+AccountType.java; no interest or repayment logic anywhere
+Unimplemented features would become nonfunctional UI
+Reject for v1
+SAVINGS and CURRENT only
+Deposits and withdrawals are open API calls
+TransactionController.addTransactions
+Anyone could mint funds in simulated money
+Adapt
+No customer deposits; admin funding events with reason and audit (D7)
+ddl-auto: update, show-sql: true, root/root database credentials, secrets in YAML
+All application.yml files
+Unsafe and unrepeatable schema management
+Reject
+Flyway migrations, ddl-auto: validate, secrets from environment
+Money as BigDecimal with no scale or column definition
+Account.java, Transaction.java
+Unspecified precision
+Adapt
+Integer minor units (BIGINT) with a Money type
+Layered code: controller, service interface and implementation, DTO, mapper, repository
+Package layout in every module
+Clear, familiar structure
+Reuse concept
+Same layering inside feature packages; form DTOs, no entities in controllers
+Central exception handler and error code enum
+GlobalExceptionHandler.java, GlobalErrorCode.java
+Good pattern; handler returns raw validation messages
+Adapt
+@ControllerAdvice returning friendly pages and a correlation ID, no internal messages
+spring-boot-starter-validation present but no @Valid or constraint annotations found
+Search across all .java files returned none
+Validation is declared but not applied
+Reject
+Bean Validation on every form DTO with server-side tests
+Tests: three default test classes; the one opened is assertTrue(true)
+*ApplicationTests.java
+No evidence of working behaviour
+Reject
+Test-first phases with the strategy in section 8
+Documentation: per-service README files, Postman collection, Javadoc
+*/README.md, postman_collection/, docs/
+Useful for explaining flows
+Adapt
+README per phase and a request collection for any REST endpoints
+Assumption: README claims about behaviour match the code
+README text not line-by-line compared
+Several code paths contradict their descriptions (see closure and status rows)
+Treat READMEs as intent only
+Rely on code and tests, not documentation
+12.3 Adaptation plan
+No reference source file, dependency, schema or configuration is copied. Only the domain ideas below carry over, and each is re-implemented on the approved stack.
+Reused as concepts
+• Approval workflow before an account becomes usable.
+• A reference ID that ties a transfer to its ledger rows.
+• Explicit account lifecycle states.
+• Zero-balance rule for closing an account.
+• Feature split into user, account, transaction and transfer areas, with controller, service, DTO and repository layering.
+• Central exception handling with typed error codes.
+Adapted
+• Account number generation (unique, locked, database-backed).
+• Account and user status sets.
+• Money representation (integer minor units).
+• Deposits and withdrawals (admin funding events only).
+• Error handling (friendly pages and correlation IDs).
+Rebuilt from scratch
+• The transfer and ledger posting path: one local transaction, ordered locks, idempotency key, append-only ledger.
+• Authentication and authorization: Spring Security sessions, CSRF, ownership checks.
+• Schema management: Flyway.
+Rejected
+• Microservices, gateway, Eureka, Feign, Keycloak, Spring Boot 2.7 and javax.*, ddl-auto: update, committed secrets, BeanUtils.copyProperties onto entities, public balance-setting endpoints, unused account types, empty tests.
+Changes this analysis makes to earlier sections
+• Section 2.4 package layout becomes feature-first, mirroring the reference's service boundaries as in-process packages.
+• Section 3 account statuses become PENDING, ACTIVE, FROZEN, CLOSED, and account types SAVINGS and CURRENT.
+• Section 7 gains an admin approval queue and a close-account action.
+• Section 9 moves a minimal approval queue into Phase 3 and adds a log-scrubbing test to Phase 2.
+• The approved technology stack is unchanged. No genuine technical blocker was found that would justify overriding it.
+12.4 UI/UX: design brief (no reference design exists)
+Because the reference has no frontend, this brief is original and was approved as D8 on 17 Oct 2026. It uses only HTML, CSS and vanilla JavaScript rendered through JSP tag files, with no external fonts or libraries, so the CSP in section 5 stays strict.
+Layout and navigation
+• Customer area: top bar with the product name, a left navigation (Dashboard /dashboard, Accounts /accounts, Transfers /transfers/new, History /transactions, Profile /profile; each entry appears in the phase that builds its route, C1) that collapses to a menu button below 768 px, and a single content column.
+• Admin area: same shell with a distinct accent bar and its own navigation (Approvals, Users, Accounts, Funding, Audit, Reconciliation).
+• The top bar of both areas has a user menu with Change password (/password) and Sign out. For a user who must change the password, the menu and navigation show only those two entries; this is a convenience, and the server enforces the restriction (5.2).
+• Pages: account cards on the dashboard, data tables with horizontal scroll inside their own container, forms in a single column with labels above fields.
+Visual tokens (final values contrast-checked to WCAG AA in Phase 2)
+Token
+Proposed value
+Use
+Primary
+Deep blue #0B4F8A
+Buttons, links, active navigation
+Success
+Green #1B7F4B
+Completed transfers, success messages
+Warning
+Amber #8A5A00
+Pending states
+Danger
+Red #B3261E
+Errors, frozen accounts
+Surface and text
+Off-white #F6F8FA, white cards, near-black #1A2330
+Page, cards, body text
+Typeface
+System UI font stack, tabular numerals for money
+No external font requests
+Spacing and radius
+4 px base grid, 8 px card radius
+Consistent rhythm
+A dark theme follows prefers-color-scheme using the same token names.
+Reusable components (JSP tag files)
+• Layout shell, page header, flash message region.
+• Form field with label, hint and error text.
+• Money amount, status badge (text plus icon, never color alone), empty state, pagination, confirmation dialog.
+• Summary card for an account.
+Feedback patterns
+• Success messages through Post/Redirect/Get; errors in a summary at the top of the form that receives focus, with inline field errors.
+• Buttons disable and show progress while a request is in flight.
+• Every table has a designed empty state with a clear next action.
+What is deliberately not borrowed: branding, names, sample data, credentials or content from the reference project.
+12.5 Limitations and new decisions
+Limits of this analysis
+• Static reading only. Nothing was compiled, started or tested, so runtime behaviour is inferred from code, not observed.
+• The generated Javadoc under docs/ was listed but not read, because it duplicates the source.
+• I read every controller and service implementation of the five business modules, the gateway security class, configs, entities and enums. I did not read every mapper, DTO and exception class, so small details there may differ.
+• The Keycloak realm configuration and the external API documentation linked from the README are not in the archive, so authorization rules defined there could not be checked.
+• Per-module READMEs were skimmed, not compared line by line against the code.
+Decision status
+D6, D7 and D8 were approved on 17 Oct 2026. The full decision register is in section 0.
+13. Blueprint consistency checklist and open items
+Revised after patch 3 (N1, N2, I8) and the Phase 0 implementation review. The affected sections were re-read and every changed term was searched for stale wording. This is a document review, not a test of any code.
+Area
+What was checked
+Result
+Sections
+Decisions, rules, corrections, resolutions
+D1 to D9, R1 to R3, C1 to C9, O1 to O3, I1 to I8, N1 and N2 are approved or resolved in sections 0, 0.1 and 0.2; none is called proposed or open elsewhere
+Consistent
+0, 0.1, 0.2
+Traceability
+Every decision, rule, correction, resolution and interpretation maps to sections, a phase and a test group, including N1, N2 and I8
+Consistent
+15
+Database model
+number_sequence; user-status CHECK; must_change_password; funding_event insert-only; no new table for the password-change throttle (it is in memory)
+Consistent
+3, 3.1 to 3.4, 5.2
+Database accounts
+Two accounts; production does not run Flyway at application startup; Phase 0 check 4 and the Phase 1 privilege test agree
+Consistent
+2.3, 3.1, 9
+User status
+Three statuses, transitions and effects; the password-change throttle never changes user status
+Consistent
+3.2, 5.2
+Forced password change and reuse
+One /password route for both roles; the allow-list keeps the password page and logout reachable; I8 is enforced in PasswordService and tested for both roles and for the forced workflow
+Consistent
+5.2, 7, 8, 9
+Password-change throttle (N1)
+Behavior, defaults, response, logging, audit events, reset and the no-lockout rule are defined once in 5.2; section 5, 7, 8, 9, 11 and the configuration table agree; login lockout is unchanged
+Consistent
+5, 5.2, 7, 8, 9, 11
+Route phases (N2)
+Every route in section 7 now has a phase: / in Phase 2, /profile in Phase 3, /password in Phase 2; the Profile entry appears only in Phase 3 and only for CUSTOMERs; /accounts and /transactions contracts are unchanged
+Consistent
+7, 7.1, 9
+Account lifecycle and numbering
+Unchanged by this patch
+Consistent
+3, 3.3
+Funding lifecycle and corrections
+Unchanged by this patch
+Consistent
+3.4, 3.5, 4
+Ledger and transfers
+Unchanged by this patch
+Consistent
+4
+Currency calculations
+Unchanged
+Consistent
+3, 8
+Security model and audit list
+Throttle row added to brute force; audit events listed in 5.2; role changes not mentioned
+Consistent
+5, 5.2
+Route inventory and navigation
+No route or navigation entry was added or removed; the Phase 0 proof page is declared outside the inventory (N4)
+Consistent
+6.2, 7, 12.4
+REST endpoint
+Unchanged
+Consistent
+6.4, 7
+Test plan
+Throttle, reuse and route-phase test groups added; earlier groups unchanged
+Consistent
+8
+Phase dependencies
+Landing and throttle in Phase 2, profile in Phase 3; the dependency notes name them
+Consistent
+9
+Reference analysis
+Counts, @Transactional qualification and unverified-version markers unchanged
+Consistent
+2.2, 12
+Stack and fixed constraints
+Unchanged; NetBeans and Mockito explicit
+Consistent
+2.2, 2.3
+Simulator labeling
+Unchanged
+Consistent
+6.1
+Table-level grant timing
+Section 3.1 lists per-table privileges, but table-level grants can only follow table creation, and section 3.1 does not say when they are applied after each migration
+Open item N3
+3.1, 9
+Phase 0 proof page lifecycle
+The proof page is outside the route inventory, and the blueprint does not say when it is removed
+Open item N4
+2.3, 7, 9
+Open items found while preparing Phase 0 (neither blocks Phase 0; N3 should be settled before Phase 1):
+• N3. Table-level privileges (3.1) can only be granted to tables that exist, and the application account must have SELECT and INSERT but no UPDATE on append-only tables. Proposal: Phase 0 grants SELECT and INSERT on the whole schema, which already satisfies the append-only rule; Phase 1 adds an idempotent grants script that the operator re-runs after each migration set to add table-level UPDATE on the mutable tables only. Please confirm or choose another approach.
+• N4. The Phase 0 proof page (/phase0/proof) is outside the route inventory. Proposal: it stays only under the dev and test profiles and is deleted, with its test, when Phase 2 delivers the landing page that replaces it as the rendering proof. Please confirm.
+Resolved on 17 Oct 2026: O1 to O3, I1 to I8, N1, N2 (section 0.2).
+Non-blocking configuration proposals. These become application configuration with the defaults below; you can change any of them without changing the blueprint.
+Parameter
+Proposed default
+Minimum transfer
+₹1.00
+Maximum per transfer
+₹50,000.00
+Daily transfer total per customer
+₹2,00,000.00
+Maximum per funding event
+₹10,00,000.00
+Pending applications
+One per account type per customer
+Login lockout
+5 failed attempts, 15-minute lock
+Password-change throttle
+5 incorrect current-password attempts per user in 15 minutes (securebank.security.password-change.max-failures and .window); never locks the account
+Password policy
+At least 12 characters, bcrypt hashing, passwords over 72 bytes rejected because bcrypt ignores the excess; a new password must differ from the current one (I8)
+Session timeout
+15 minutes idle, 8 hours absolute
+History page size
+20 rows
+History API page size
+Default 20, maximum 50; larger values are rejected
+Account number format
+Configured numeric prefix plus zero-padded sequence; length and any check digit fixed in Phase 1
+Session cookie Secure flag
+True by default (prod); false only under the explicitly selected dev profile
+14. Approval status
+Blueprint v2.3: D1 to D9, R1 to R3, corrections C1 to C9, open items O1 to O3, interpretations I1 to I8, and decisions N1 and N2 are approved or resolved (17 Oct 2026). Section 13 lists two new open items found while preparing Phase 0, N3 (table-level grant timing, to be settled before Phase 1) and N4 (proof page lifecycle); neither blocks Phase 0. Phase 0 starts only after a separate, explicit instruction from you. This patch is documentation-only: no application code has been written, compiled or run.
+15. Requirements traceability matrix
+Each item maps to the design sections, the phase that builds it and the test group in section 8.1 that verifies it. Phase numbers follow section 9. This section was created in v2.1 from the register and the corrections; earlier versions had no matrix.
+ID
+Requirement in brief
+Design sections
+Built in phase
+Verified by
+D1
+Boot 3.5.x and Tomcat 10.1, risk documented, versions verified
+2.2, 2.3, 11
+0
+Phase 0 checks 1 to 7; upgrade-path note
+D2
+CUSTOMER and ADMIN only; admins own no accounts
+3, 5, 7
+2, 3
+Money and role tests
+D3
+INR in integer paise
+3, 8
+1
+Money and role tests
+D4
+No MFA in v1; extensible authentication chain
+5
+2
+Document review; no MFA claim
+D5
+Internal transfers only
+4, 7
+4
+Transfer tests; authorization matrix
+D6
+Account approval before use
+3, 7, 9
+3
+Funding and lifecycle tests
+D7
+Admin funding only; no customer deposit or withdrawal
+3, 3.4, 4, 5, 7, 8, 9
+4
+Funding and lifecycle tests; route-absence check
+D8
+New UI from the design brief
+6, 12.4
+2 onward
+Accessibility checks
+D9
+Environment-supplied first-admin bootstrap
+3.1, 3.2, 5, 9
+2
+Bootstrap tests; Phase 8 runbook
+R1
+FROZEN accounts cannot send, receive or be funded
+3, 4
+3, 4, 6
+Funding and lifecycle tests; transfer tests
+R2
+Rejection is terminal; re-application allowed
+3, 7
+3
+Bootstrap and application tests
+R3
+Registration does not sign the user in
+7
+2
+Web-layer tests
+C1
+Accounts list and History index routes; navigation consistent
+6.2, 7, 7.1, 12.4
+3, 5
+Navigation tests; ownership matrix
+C2
+Approved paginated history API with ownership, limits, validation, errors
+5, 6.4, 7, 7.1
+5
+History API tests
+C3
+D8 shown as approved in 12.4
+12.4
+Document only
+Document review
+C4
+Concurrency-safe account number sequence
+3, 3.3
+1, 3
+Account number tests
+C5
+User statuses, transitions, sign-in and session effects
+3.2, 5, 7
+1, 2, 6
+User status and session tests
+C6
+Funding-event lifecycle and immutability
+3, 3.4, 4
+1, 4
+Funding lifecycle tests
+C7
+Separate least-privilege application and migration accounts
+2.3, 3.1, 5
+0, 1, 8
+Database privilege tests
+C8
+Profile-aware Secure cookie
+5, 5.1
+0, 2, 7, 8
+Profile and cookie tests
+C9
+NetBeans compatibility and Mockito in constraints and checklist
+2.2, 2.3, 13
+0
+Tooling checks (NetBeans part manual-only)
+O1
+One password-change function for both roles; server-enforced gate for must_change_password
+3, 3.2, 5, 5.2, 7, 7.1, 12.4
+2
+Forced password change tests
+O2
+No role-change feature or audit event; fixed roles
+5
+2
+Role and audit tests
+O3
+Funding corrections out of scope; documented escalation and recovery; posted records never edited or deleted
+3.4, 3.5
+4, 8 (runbook)
+Funding correction absence tests
+I1
+SameSite=Lax on every profile
+5, 5.1
+2
+Profile and cookie tests
+I2
+/transactions as an account list; no combined history
+7, 7.1
+5
+Navigation tests
+I3
+must_change_password on app_user
+3, 5.2
+1, 2
+Forced password change tests
+I4
+Self-lock and last-admin guards; audited admin disable and enable
+3.2, 7
+2, 6
+User status and session tests
+I5
+Failure records in a separate transaction
+4
+4
+Funding lifecycle tests; transfer rollback tests
+I6
+Idempotency key with a different payload is a conflict
+3.4, 4
+4
+Idempotency conflict tests
+I7
+User status independent of account status
+3.2
+2, 6
+User status and session tests
+I8
+New password must differ from the current one, enforced in the service layer (approved, final)
+5.2, 7
+2
+Password reuse tests; forced password change tests
+N1
+Password-change throttle: shared throttle plus a per-user endpoint limit that never locks the account; friendly response; no secrets in logs; audited; reset on success
+5, 5.2, 7, 11
+2
+Password-change throttle tests
+N2
+/ in Phase 2 and /profile (CUSTOMER only) in Phase 3 with its navigation entry
+7, 9
+2, 3
+Route phase tests; navigation tests

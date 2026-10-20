@@ -1,0 +1,24 @@
+target/
+**/target/
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+scripts/set-env.local.ps1
+**/set-env.local.ps1
+*.log
+.DS_Store
+
+phase0-dependency-tree.txt
+phase0-flyway-check.txt
+
+# Downloaded Keycloak distribution
+identity/.keycloak/
+
+# Local Keycloak environment secrets
+**/set-keycloak-env.local.ps1
+
+# Empty placeholder archive
+/services/account-service.zip
