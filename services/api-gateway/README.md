@@ -56,19 +56,46 @@ java -jar target\api-gateway-1.0.0.jar   # run the packaged jar
 
 ## 5. Routes and path behavior
 
-| Public path (gateway) | Target base URL variable | Default |
-|---|---|---|
-| `/api/customers/**` | `CUSTOMER_SERVICE_BASE_URL` | `http://localhost:8081` |
-| `/api/accounts/**` | `ACCOUNT_SERVICE_BASE_URL` | `http://localhost:8082` |
-| `/api/transactions/**` | `TRANSACTION_SERVICE_BASE_URL` | `http://localhost:8084` |
-| `/api/ledger/**` | `LEDGER_SERVICE_BASE_URL` | `http://localhost:8083` |
+The public `/api/...` prefixes are kept, and each route rewrites the path to what the service really serves.
 
-- **No path rewriting.** `GET /api/customers/42?x=1` becomes `GET <CUSTOMER_SERVICE_BASE_URL>/api/customers/42?x=1`.
-  Downstream services must serve under the same `/api/...` prefix, or edit `RouteConfig`.
+| Public path (gateway) | Rewritten to (service path) | Methods | Gateway rule | Role the service itself requires (realm role) |
+|---|---|---|---|---|
+| `/api/customers/**` | `/api/v1/customers/**` | all | authenticated user token | `securebank-staff` or `securebank-admin` (status PATCH: `securebank-admin`) |
+| `/api/accounts/**` | `/api/v1/accounts/**` | all | authenticated user token | `admin` or `customer` (ownership checked) |
+| `/api/account-numbers/**` | `/api/v1/account-numbers/**` | all | authenticated user token | `admin` or `customer` |
+| `/api/admin/accounts/**` | `/api/v1/admin/accounts/**` | all | realm role **`admin`** (`ROLE_ADMIN`) and no `transaction-service` role | `admin` |
+| `/api/transactions/**` | `/api/v1/transfers/**` | all | authenticated user token | `customer` to initiate; `customer` or `transfer-operator` to read; `transfer-operator` for retry/reconcile/operations (role not yet in the realm) |
+| `/api/ledger/{resource}[/**]` | `/api/v1/{resource}[/**]` (e.g. `/api/ledger/journal-entries` -> `/api/v1/journal-entries`) | **GET only** | authenticated user token | any of `ledger-reader`, `ledger-writer`, `ledger-reverser` (customers get 403) |
+
+Base URL variables: `CUSTOMER_SERVICE_BASE_URL` (`http://localhost:8081`), `ACCOUNT_SERVICE_BASE_URL` (`http://localhost:8082`;
+account, account-numbers and admin routes), `TRANSACTION_SERVICE_BASE_URL` (`http://localhost:8084`),
+`LEDGER_SERVICE_BASE_URL` (`http://localhost:8083`).
+
+**Administrator role.** The gateway admin rule uses the realm role `admin`, the same role Account Service requires on
+`/api/v1/admin/**` and the one the realm export gives `dev-admin`. `bank-admin` (`ROLE_BANK_ADMIN`; no rule uses it),
+`securebank-admin` and `securebank-staff` (Customer Service roles) do **not** open `/api/admin/**`; accepting them
+would only move the 403 downstream. Tests: `PublicApiBoundaryTest` (fixtures read the tracked realm export).
+
+Not routable through the gateway (deny-by-default, no route exists, no upstream call is made):
+
+| Path | Result | Why |
+|---|---|---|
+| `/internal/**` | 403 (401 without token) | Service-to-service contract (Account/Ledger internal adapters). Only Transaction Service calls it, directly, with its own client-credentials token. |
+| `/actuator/**` (except `/actuator/health`) | 403 | Operational endpoints. |
+| `/v3/api-docs*`, `/swagger-ui*` | 403 | Not public. |
+| `/api/ledger/**` with POST/PUT/PATCH/DELETE | 403 | Money moves only through the Transaction saga; Ledger writes are never public. |
+| raw `/api/v1/**`, bare `/api/ledger` and `/api/ledger/`, and any other path | 404 `ROUTE_NOT_FOUND` | Only the public prefixes above exist. |
+| paths with `..`, `.`, `//`, `;`, `\`, or `%2e %2f %5c %00 %25` | 400 `INVALID_PATH` | Stops dot-segment/encoded traversal that could steer a rewrite toward `/internal`. |
+
+- Service-account tokens (realm role `transaction-service`) are **refused** on the public API (403), including on `/api/admin/**` even if the token also carries `admin`: a service identity
+  must not act as a user.
+- The `/api/admin/accounts` and `/api/account-numbers` routes were added in checkpoint 4 because Account Service
+  serves those paths; remove the blocks in `RouteConfig` if you do not want them public.
+- Query strings, `Authorization`, `Idempotency-Key` and the request body pass through unchanged.
 - Base URLs must be `scheme://host[:port]` with no path or query (validated at startup).
-- `/api/customers` (no trailing segment) also matches.
-- Unknown paths return a sanitized `404 ROUTE_NOT_FOUND`. `/actuator/**` is never routed to services.
-- Routes live in `config/RouteConfig.java`: one explicit block per service.
+- Enforced where: authentication and the rules above in `security/SecurityConfig` (`PublicApiBoundaryTest`);
+  routes and rewrites in `config/RouteConfig` (`RoutingTest`); path rejection in `web/PathSanitizationWebFilter`;
+  CORS in `application.yml` (`CorsApiContractTest`). Services still enforce their own roles.
 
 ## 6. JWT and Keycloak
 
@@ -77,13 +104,12 @@ java -jar target\api-gateway-1.0.0.jar   # run the packaged jar
   the gateway starts even if the IdP is down; until it resolves, requests get `503 AUTH_PROVIDER_UNAVAILABLE`.
 - Stateless: no sessions, no cookies, CSRF disabled (bearer-token API).
 - The bearer token is forwarded unchanged to downstream services.
-- **Intended Keycloak integration (not yet configured):** create a realm (e.g. `securebank`),
-  a public/confidential client for the front end, realm roles such as `customer` and `bank-admin`,
-  and set the issuer to `https://<keycloak-host>/realms/<realm>`.
+- **Keycloak:** the tracked realm export `identity/keycloak/securebank-realm.json` (realm `securebank`) defines the roles;
+  set the issuer to `http://localhost:8180/realms/securebank` locally (or your Keycloak realm URL).
 - **Authority mapping:** scopes -> `SCOPE_<scope>`; `realm_access.roles` -> `ROLE_<ROLE>`
-  (`bank-admin` -> `ROLE_BANK_ADMIN`). The gateway currently only *requires authentication* for
-  `/api/**`; role-based rules belong to the services until contracts are final. Add per-route
-  rules in `SecurityConfig` (`.pathMatchers(...).hasRole(...)`) when they are.
+  (`bank-admin` -> `ROLE_BANK_ADMIN`). The gateway *requires authentication* for all
+  public routes, realm role `admin` (`ROLE_ADMIN`) for `/api/admin/**`, and refuses service-account tokens; all other role rules
+  (staff, customer, transfer-operator, ledger roles) are enforced by the services.
 - Audience (`aud`) validation is not enforced; add it if your Keycloak client setup needs it.
 - No tokens, keys or secrets are included in this project.
 
@@ -136,14 +162,16 @@ Error body (all gateway-generated errors):
 - *401 with a token you expect to be valid*: expired token, wrong issuer, or clock skew.
 - *503 SERVICE_UNAVAILABLE*: the target service is not running at the configured base URL.
 - *504*: service slower than `SECUREBANK_RESPONSE_TIMEOUT`.
-- *404 ROUTE_NOT_FOUND on an `/api/...` path*: only the four prefixes in section 5 are routed.
+- *404 ROUTE_NOT_FOUND on an `/api/...` path*: only the prefixes in section 5 are routed; raw `/api/v1/...` paths are intentionally not exposed.
+- *400 INVALID_PATH*: the path contained dot segments, `//`, `;`, a backslash or an encoded `/`, `.`, `\\` or NUL.
+- *403 on `/internal/...`*: by design; internal endpoints are not reachable through the gateway.
 - *Startup error about a base URL*: remove any path from `*_SERVICE_BASE_URL`.
 - *Browser CORS errors*: add the exact origin (scheme+host+port) to `SECUREBANK_CORS_ALLOWED_ORIGINS`.
 - *Maven cannot download dependencies*: check proxy/network access to Maven Central.
 
 ## 11. Integration requirements for the downstream services
 
-1. Serve APIs under the same `/api/customers`, `/api/accounts`, `/api/transactions`, `/api/ledger` prefixes (or change `RouteConfig`).
+1. Serve the paths in the section 5 table (the `/api/v1/...` column), or change the rewrite in `RouteConfig` and `RoutingTest` together.
 2. **Validate the JWT yourself** (same issuer) and enforce authorization. Never trust the gateway alone,
    and never trust identity from headers.
 3. Return business errors as normal HTTP responses; the gateway passes them through untouched.

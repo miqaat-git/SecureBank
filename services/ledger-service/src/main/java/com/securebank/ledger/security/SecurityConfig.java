@@ -21,6 +21,9 @@ import org.springframework.security.web.SecurityFilterChain;
  *   <li>POST /api/v1/journal-entries: LEDGER_WRITER</li>
  *   <li>POST /api/v1/journal-entries/{id}/reversals: LEDGER_REVERSER</li>
  *   <li>GET /api/v1/**: LEDGER_READER, LEDGER_WRITER or LEDGER_REVERSER</li>
+ *   <li>POST /internal/journal-entries: LEDGER_WRITER</li>
+ *   <li>POST /internal/journal-entries/{businessReference}/reversals: LEDGER_REVERSER</li>
+ *   <li>GET /internal/journal-entries/by-reference/{businessReference}: any Ledger role</li>
  *   <li>everything else: denied</li>
  * </ul>
  */
@@ -60,6 +63,12 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.POST, "/api/v1/journal-entries/*/reversals")
                             .hasRole(ROLE_REVERSER);
                     auth.requestMatchers(HttpMethod.GET, "/api/v1/**")
+                            .hasAnyRole(ROLE_READER, ROLE_WRITER, ROLE_REVERSER);
+                    // Internal adapter for Transaction Service (same roles as the public API; never public).
+                    auth.requestMatchers(HttpMethod.POST, "/internal/journal-entries").hasRole(ROLE_WRITER);
+                    auth.requestMatchers(HttpMethod.POST, "/internal/journal-entries/*/reversals")
+                            .hasRole(ROLE_REVERSER);
+                    auth.requestMatchers(HttpMethod.GET, "/internal/journal-entries/by-reference/*")
                             .hasAnyRole(ROLE_READER, ROLE_WRITER, ROLE_REVERSER);
                     auth.anyRequest().denyAll();
                 })

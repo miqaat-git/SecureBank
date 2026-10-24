@@ -348,3 +348,22 @@ This service never calls other services' databases and does not implement a tran
 | 503 `CUSTOMER_SERVICE_UNAVAILABLE` | Customer Service not running on `CUSTOMER_SERVICE_BASE_URL` or its contract differs (section 10) |
 | 409 `CONCURRENT_MODIFICATION` | Another change won the race; reload and retry (same idempotency key for internal calls) |
 | Tests fail to download dependencies | Check internet/proxy access to Maven Central, then `mvn -U clean test` |
+
+## Canonical internal contract for the Transaction Service (Checkpoint 2, UNVERIFIED: not yet compiled or run)
+
+All routes require `ROLE_TRANSACTION_SERVICE` (`/internal/**`) and must never be routed by the Gateway.
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/internal/accounts/{accountId}` | `{accountId, customerId, status, currency}` (no balance) |
+| POST | `/internal/accounts/{accountId}/operations` | 201 applied / 200 idempotent replay, body `status: "SUCCEEDED"` |
+| GET | `/internal/accounts/{accountId}/operations/{operationId}` | 200 recorded / 404 `OPERATION_NOT_FOUND` |
+
+Request: `{operationId, type: DEBIT|CREDIT|REVERSE_DEBIT, amount, currency, transferId, reversesOperationId?}`.
+`operationId` is the idempotency key. `reversesOperationId` is required for `REVERSE_DEBIT` only; the named debit
+must exist on the same account with the same amount and transfer, and can be reversed once
+(`OPERATION_ALREADY_REVERSED`, enforced by the unique `reverses_key` column added in `V2`).
+Errors never return 2xx. A 409 `CONCURRENT_MODIFICATION` means nothing was applied; Transaction Service retries it.
+The older `/internal/v1/accounts/{id}/balance-operations` endpoint is kept unchanged (DEBIT/CREDIT only).
+Known limitation: reversal credits are refused on FROZEN/CLOSED accounts (the transfer escalates to reconciliation).
+Run `V2` against a real MySQL 8.0.16+ before relying on it; the H2 tests do not execute Flyway scripts.

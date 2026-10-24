@@ -5,6 +5,7 @@ import com.securebank.transaction.client.AccountServiceClient;
 import com.securebank.transaction.client.AccountServiceHttpClient;
 import com.securebank.transaction.client.LedgerServiceClient;
 import com.securebank.transaction.client.LedgerServiceHttpClient;
+import com.securebank.transaction.client.OAuth2ClientCredentialsTokenProvider;
 import com.securebank.transaction.client.RemoteHttp;
 import com.securebank.transaction.client.RestClients;
 import com.securebank.transaction.client.ServiceTokenProvider;
@@ -17,6 +18,9 @@ public class RemoteClientsConfig {
 
     @Bean
     public ServiceTokenProvider serviceTokenProvider(RemoteClientProperties props) {
+        if (props.auth().mode() == RemoteClientProperties.Auth.Mode.OAUTH2_CLIENT_CREDENTIALS) {
+            return OAuth2ClientCredentialsTokenProvider.create(props.auth());
+        }
         return new StaticServiceTokenProvider(props.auth());
     }
 

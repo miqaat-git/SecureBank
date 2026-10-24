@@ -18,7 +18,7 @@ provider exists in the project**, so there was no real value to put in the varia
 | Issuer value | Not defined anywhere. Gateway README gives `http://localhost:8180/realms/securebank` as an example shape only. |
 | Signature validation | Every service discovers the JWKS from the issuer (OIDC discovery). Gateway and Account/Customer decoders are lazy (start without the IdP, fail closed); Ledger uses Spring Boot's issuer-uri auto-configuration. Nobody holds keys locally. |
 | Who validates independently | All four: Gateway (reactive), Customer, Account, Ledger. Gateway forwards the `Authorization` header unchanged and injects no identity headers; it strips spoofable identity headers. |
-| Roles | Account: realm roles `admin`, `customer`, `transaction-service` (+ client roles of `securebank-account-service`). Customer: `securebank-admin`, `securebank-staff`. Ledger: `ledger-reader`, `ledger-writer`, `ledger-reverser`. Gateway: any authenticated user (maps `ROLE_*` and `SCOPE_*` but enforces none). |
+| Roles | Account: realm roles `admin`, `customer`, `transaction-service` (+ client roles of `securebank-account-service`). Customer: `securebank-admin`, `securebank-staff`. Ledger: `ledger-reader`, `ledger-writer`, `ledger-reverser`. Gateway: any authenticated user token, except realm role `admin` for `/api/admin/**`, no `/internal/**`, GET-only ledger, and service-account tokens refused (see `services/api-gateway/README.md` section 5). |
 | Customer identity | Account Service reads claim `customer_id` (UUID) for CUSTOMER tokens. |
 | Issuer settings documented consistently? | Four different variable names, all the same concept: `SECUREBANK_JWT_ISSUER_URI` (gateway), `CUSTOMER_JWT_ISSUER_URI`, `ACCOUNT_JWT_ISSUER_URI`, `LEDGER_JWT_ISSUER_URI`. Because one gateway forwards one token to all services, **all four must hold the identical issuer**. |
 
@@ -27,12 +27,9 @@ names**. The realm defines the union of roles; no claim or role format was chang
 
 ## 3. Other confirmed defects (not changed, need a decision from you)
 
-1. **Gateway paths do not match the services.** The gateway forwards `/api/customers/**`, `/api/accounts/**`,
-   `/api/ledger/**` with no rewrite, but Customer serves `/api/v1/customers`, Account `/api/v1/accounts`
-   (+ `/api/v1/admin/accounts`), and Ledger `/api/v1/journal-entries` and `/api/v1/accounts/{ref}/ledger-lines`.
-   Through the gateway these calls return 404. Fix by adding path rewrites in the gateway's `RouteConfig`
-   (and updating `RoutingTest`). Not done: it changes a documented public contract and the admin-route and
-   Transaction Service paths are not defined yet.
+1. ~~Gateway paths do not match the services.~~ Resolved in checkpoint 4: the gateway rewrites the public
+   `/api/...` prefixes to the services' `/api/v1/...` paths and does not route `/internal/**`
+   (see `services/api-gateway/README.md` section 5).
 2. **Customer-role tokens cannot open accounts via Account Service.** Account Service forwards the caller's
    token to Customer Service, which only accepts `securebank-staff`/`securebank-admin`. A `customer` token gets
    403 there. Giving customers the staff role would expose all customer records, so the realm does **not** do that.
@@ -103,7 +100,9 @@ cd .\ledger-service
 
 Start Customer (8081), Account (8082) and then the Gateway (8080) the same way, each in its own window after
 dot-sourcing `scripts\set-env.local.ps1`. Services start even if Keycloak is down (they fail closed and
-reject tokens until it is reachable), but start it first to avoid confusion. Transaction Service is untouched.
+reject tokens until it is reachable), but start it first to avoid confusion. Then start Transaction (8084) last. For checkpoint 3/4 it needs
+`SERVICE_AUTH_MODE=OAUTH2_CLIENT_CREDENTIALS` plus the client id/secret/token URI variables from
+`scripts\set-env.example.ps1` (secret from your local, git-ignored file only).
 
 ## 7. Verification checklist
 
@@ -123,6 +122,40 @@ curl.exe -s -o NUL -w "%{http_code}`n" -H "Authorization: Bearer garbage" http:/
 ```
 
 Automated: `mvnw.cmd clean verify` in each of the four service folders.
+
+## 7a. Money-flow runbook and synthetic end-to-end procedure (checkpoint 4; NOT yet executed)
+
+Ports: Keycloak 8180, Gateway 8080, Customer 8081, Account 8082, Ledger 8083, Transaction 8084.
+Health (public): `http://localhost:<port>/actuator/health`; through the gateway only `http://localhost:8080/actuator/health`.
+
+Realm facts to know before testing:
+* The `transaction-service` service account holds `transaction-service`, `ledger-writer`, `ledger-reverser`.
+  Transaction Service obtains its token itself; callers never send it.
+* The realm has no `transfer-operator` role, so Transaction's retry/reconcile/operations endpoints are unusable
+  until it is created. Proposal only (not applied): create the realm role and grant it to `dev-admin`.
+* `securebank-web` allows only `http://localhost:3000`. A Vite front end on `http://localhost:5173` needs that
+  origin added as redirect URI, web origin and post-logout redirect (proposal, not applied) and in
+  `SECUREBANK_CORS_ALLOWED_ORIGINS` for the gateway.
+* Tokens carry no audience; none is enforced.
+
+Procedure (use only synthetic data in a development database; never paste tokens into notes or tickets):
+1. Start everything in the order of section 6; confirm all health endpoints are UP.
+2. Obtain a `dev-customer` token and a `dev-admin` token with `identity\scripts\get-token.ps1` (kept in variables only).
+3. Create two customers and two accounts through the gateway (`POST /api/customers`, `POST /api/accounts`) with the `dev-admin` token (it holds `admin` plus the Customer Service roles).
+   Accounts open with zero balance.
+4. Fund the source account: there is no public funding path. Call Account Service's internal CREDIT operation
+   directly on port 8082 with the service token (`get-token.ps1 -Service`) and a fresh `operationId`.
+5. `POST /api/transactions` through the gateway with a customer token, header `Idempotency-Key: <new uuid>` and body
+   `sourceAccountId`, `destinationAccountId`, `amount`, `currency`. Expect 201 (completed) or 202 (in progress).
+   Repeat the identical request: expect 200 with `Idempotent-Replay: true` and no second movement.
+6. Verify: both balances via `GET /api/accounts/{id}` (customer token for an owned account, or `dev-admin`);
+   the transfer via `GET /api/transactions/{id}` (customer token; `dev-admin` is refused by Transaction Service);
+   the journal entry via `GET /api/ledger/journal-entries` with the `dev-admin` token (holds `ledger-reader`; a customer token gets 403).
+7. Negative checks: `/internal/accounts/{id}` and `/api/v1/accounts` through port 8080 must not succeed (403/404);
+   `POST /api/ledger/journal-entries` must be 403.
+
+Known gaps: no funding workflow; a `customer` token cannot open accounts (defect 2); the policy for reversing
+a frozen source is undecided; Account V2 and Ledger concurrency were only tested on H2.
 
 ## 8. Limitations
 

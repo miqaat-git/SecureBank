@@ -162,7 +162,7 @@ retries, recovery and reconciliation to converge.
   recovery: write an outbox row in the same transaction as each state change and publish asynchronously. Nothing
   of that exists today.
 
-## 9. Required Account Service contract (PROPOSED, must be aligned)
+## 9. Required Account Service contract (PROPOSED; implemented in Account Service Checkpoint 2, see its README)
 
 All paths are configurable. Internal operations must be callable by this service's service credential.
 
@@ -175,7 +175,7 @@ All paths are configurable. Internal operations must be callable by this service
   409 `{"code":"OPERATION_IN_PROGRESS"}` while processing; `PENDING` is treated as unknown.
 * `GET /internal/accounts/{accountId}/operations/{operationId}` -> `{"status":"SUCCEEDED|REJECTED|PENDING"}` or 404 (never recorded).
 
-## 10. Required Ledger Service contract (PROPOSED, must be aligned)
+## 10. Required Ledger Service contract (PROPOSED; implemented by the Ledger internal adapter, see section 13)
 
 * `POST /internal/journal-entries`, header `Idempotency-Key`, body `{"businessReference":"TRANSFER-<id>",
   "idempotencyKey","description","currency","entries":[{"accountId","direction":"DEBIT|CREDIT","amount"}]}` ->
@@ -213,3 +213,55 @@ No Keycloak URL, secret or token is invented here.
 - A rejected compensation requires human action; there is no automatic escalation or alerting yet.
 - Connect timeouts surface as ambiguous (UNKNOWN) rather than "not sent": conservative on purpose.
 - Contract tests against real services do not exist; the included HTTP client tests use mock servers only.
+
+## 13. Service-to-service authentication and Ledger contract (Checkpoint 3: implemented, UNVERIFIED until built)
+
+`SERVICE_AUTH_MODE` selects how Account and Ledger calls are authenticated:
+
+| Mode | Behaviour |
+|---|---|
+| `NONE` (default) | No Authorization header. **Cannot succeed against the secured Account/Ledger internal endpoints**: they answer 401, which is classified as a retryable failure (never as success). For isolated tests only. |
+| `STATIC_BEARER` | Sends `SERVICE_AUTH_TOKEN`. It expires; development only. |
+| `OAUTH2_CLIENT_CREDENTIALS` | Keycloak client-credentials token, cached in memory and renewed ~60 s before expiry. Use this for any real run. |
+
+Environment variables for `OAUTH2_CLIENT_CREDENTIALS` (names only; set values in your git-ignored `set-env.local.ps1`):
+
+- `SERVICE_AUTH_MODE=OAUTH2_CLIENT_CREDENTIALS`
+- `SERVICE_AUTH_ISSUER_URI` (e.g. `http://localhost:8180/realms/securebank`; the token endpoint is derived as `<issuer>/protocol/openid-connect/token`) or `SERVICE_AUTH_TOKEN_URI` to override it
+- `SERVICE_AUTH_CLIENT_ID` (default `securebank-transaction-service`)
+- `SERVICE_AUTH_CLIENT_SECRET` (the secret of that Keycloak client; the same value as `SECUREBANK_TRANSACTION_CLIENT_SECRET`)
+- optional `SERVICE_AUTH_SCOPE`
+
+The service fails fast at startup if the client id, secret or issuer is missing. No secret is logged or put in an exception.
+
+**Roles.** The realm export already gives the service account `service-account-securebank-transaction-service` the
+realm roles `transaction-service` (Account `ROLE_TRANSACTION_SERVICE`), `ledger-writer` (post) and `ledger-reverser`
+(reverse); one token works for both services. Ledger reads `realm_access.roles` and, only if
+`ledger.security.resource-client-id` is set, that client's `resource_access` roles. If you assign these as client roles
+instead, set `ledger.security.resource-client-id` to that client id. Do not edit the realm in place; assign the roles in
+the Keycloak admin console or re-import deliberately.
+
+**Outcome classification** (what the saga does with each result):
+
+| Remote result | Saga outcome |
+|---|---|
+| 2xx with `status` `SUCCEEDED` / `POSTED` / `REVERSED` | success |
+| 4xx business rejection (e.g. 409 conflict, 422 validation) | rejected |
+| 404 on a status lookup | not found: the operation was never recorded |
+| 401/403, 429, 503, token acquisition failure, connection refused | retryable: nothing was applied |
+| timeout, connection reset, 5xx, 408/502/504, 2xx without a recognised status | **unknown**: resolved by lookup, never blindly resent |
+
+Ledger internal endpoints used (all require a Bearer token with the role shown):
+
+| Call | Role |
+|---|---|
+| `POST /internal/journal-entries` | `ledger-writer` |
+| `POST /internal/journal-entries/{originalBusinessReference}/reversals` | `ledger-reverser` |
+| `GET /internal/journal-entries/by-reference/{businessReference}` | any Ledger role |
+
+Verify (Windows PowerShell, from the repository root; the Maven wrapper lives in the customer-service module):
+
+```powershell
+.\services\customer-service\mvnw.cmd -f services\transaction-service\pom.xml -B -ntp verify
+.\services\customer-service\mvnw.cmd -f services\ledger-service\pom.xml -B -ntp verify
+```

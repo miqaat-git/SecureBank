@@ -14,7 +14,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
  * Maps Keycloak realm roles ({@code realm_access.roles}) to Spring authorities:
  * {@code customer} -> {@code ROLE_CUSTOMER}, {@code bank-admin} -> {@code ROLE_BANK_ADMIN}.
  * Malformed or missing claims yield no authorities. Authorities are mapped for downstream
- * use and future route rules; the gateway itself only requires authentication.
+ * use. Gateway rules (SecurityConfig) use ROLE_ADMIN (realm role {@code admin}) and ROLE_TRANSACTION_SERVICE;
+ * roles such as {@code bank-admin} are mapped but no rule grants them anything.
  */
 public class KeycloakAuthorityConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 

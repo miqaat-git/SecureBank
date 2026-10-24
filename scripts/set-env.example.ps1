@@ -41,7 +41,15 @@ $env:CUSTOMER_DB_MIGRATION_USERNAME = "<customer_migrator user>"
 $env:CUSTOMER_DB_MIGRATION_PASSWORD = "<customer_migrator password>"
 # $env:CUSTOMER_DB_URL = "jdbc:mysql://localhost:3306/securebank_customer"   # default shown
 
+# ---- Transaction Service (port 8084) ---------------------------------------------------------------
+# Service-to-service authentication. NONE cannot authenticate to the secured Account/Ledger internal endpoints.
+$env:SERVICE_AUTH_MODE          = "OAUTH2_CLIENT_CREDENTIALS"
+$env:SERVICE_AUTH_ISSUER_URI    = $Issuer                                  # token endpoint is derived from this
+$env:SERVICE_AUTH_CLIENT_ID     = "securebank-transaction-service"
+$env:SERVICE_AUTH_CLIENT_SECRET = "<secret of the securebank-transaction-service Keycloak client>"
+# The Transaction Service also needs its own database and issuer (see services\transaction-service\README.md).
+
 # ---- API Gateway (port 8080) -----------------------------------------------------------------------
 $env:ACCOUNT_SERVICE_BASE_URL  = "http://localhost:8082"
 $env:LEDGER_SERVICE_BASE_URL   = "http://localhost:8083"
-# $env:SECUREBANK_CORS_ALLOWED_ORIGINS = "http://localhost:3000"
+# $env:SECUREBANK_CORS_ALLOWED_ORIGINS = "http://localhost:3000"   # Vite default is http://localhost:5173 - use the exact origin your front end runs on

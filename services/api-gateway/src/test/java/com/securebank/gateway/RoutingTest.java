@@ -31,17 +31,20 @@ class RoutingTest extends AbstractGatewayTest {
 
         assertThat(uris).containsEntry("customer-service", Downstreams.CUSTOMER.baseUrl())
                 .containsEntry("account-service", Downstreams.ACCOUNT.baseUrl())
+                .containsEntry("account-numbers", Downstreams.ACCOUNT.baseUrl())
+                .containsEntry("account-admin", Downstreams.ACCOUNT.baseUrl())
                 .containsEntry("transaction-service", Downstreams.TRANSACTION.baseUrl())
                 .containsEntry("ledger-service", Downstreams.LEDGER.baseUrl());
-        assertThat(uris).hasSize(4);
+        // Exactly these routes exist: in particular nothing routes /internal/** or the raw /api/v1/** service paths.
+        assertThat(uris).hasSize(6);
     }
 
     @ParameterizedTest
     @CsvSource({
-            "/api/customers/42?x=1,customer,/api/customers/42,x=1",
-            "/api/accounts/7/balance,account,/api/accounts/7/balance,",
-            "/api/transactions/abc?page=2&size=5,transaction,/api/transactions/abc,page=2&size=5",
-            "/api/ledger/entries,ledger,/api/ledger/entries,"
+            "/api/customers/42?x=1,customer,/api/v1/customers/42,x=1",
+            "/api/accounts/7/balance,account,/api/v1/accounts/7/balance,",
+            "/api/transactions/abc?page=2&size=5,transaction,/api/v1/transfers/abc,page=2&size=5",
+            "/api/ledger/entries,ledger,/api/v1/entries,"
     })
     void forwardsPathQueryAndBearerTokenUnchanged(String uri, String service, String expectedPath, String expectedQuery) {
         client.get().uri(uri)
@@ -73,7 +76,7 @@ class RoutingTest extends AbstractGatewayTest {
                 .expectBody()
                 .jsonPath("$.service").isEqualTo("account")
                 .jsonPath("$.method").isEqualTo("POST")
-                .jsonPath("$.path").isEqualTo("/api/accounts")
+                .jsonPath("$.path").isEqualTo("/api/v1/accounts")
                 .jsonPath("$.body").isEqualTo("{\"a\":1}");
     }
 

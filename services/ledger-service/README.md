@@ -217,7 +217,7 @@ accounts and line numbers). Afterwards `GET /journal-entries/{id}` on the origin
   Transaction Service. Not implemented/verified here because those components do not exist yet.
 - `createdBy` stores only the JWT `sub` (no personal data). No customer personal information is stored.
 
-## 9. Integration contracts (planned, not implemented in this repository)
+## 9. Integration contracts (older notes; the internal adapter below is implemented in Checkpoint 3)
 
 **Transaction Service (8084) -> Ledger:** for each business event it calls `POST /api/v1/journal-entries` with a
 deterministic `businessReference` derived from its own transaction id and retries with the *same* body on
@@ -258,3 +258,23 @@ Startup problems: *"Could not resolve placeholder LEDGER_..."* = a required envi
 - The ledger cannot verify that an `accountReference` exists in Account Service.
 - Reversal is whole-entry only (no partial reversals) and a reversal cannot be reversed; to re-apply, post a new
   entry with a new business reference.
+
+## 12. Internal adapter for Transaction Service (Checkpoint 3: implemented, UNVERIFIED until built)
+
+`InternalJournalEntryController` accepts the Transaction Service wire format and delegates to the same
+`JournalEntryService` as the public API (no second ledger implementation). It must never be routed through the Gateway.
+
+| Method and path | Role | Result |
+|---|---|---|
+| `POST /internal/journal-entries` | `LEDGER_WRITER` | 201 posted, 200 + `Idempotent-Replay: true` replay, 409 `BUSINESS_REFERENCE_CONFLICT`, 422 accounting rule |
+| `POST /internal/journal-entries/{originalBusinessReference}/reversals` | `LEDGER_REVERSER` | 201 / 200 replay / 404 unknown original / 409 `ENTRY_ALREADY_REVERSED` |
+| `GET /internal/journal-entries/by-reference/{businessReference}` | reader, writer or reverser | 200 entry (`status: POSTED`) or 404 `ENTRY_NOT_FOUND` |
+
+Mapping: `entries[]` becomes `lines[]` numbered 1..n in request order (`DEBIT` -> `debitAmount`, `CREDIT` ->
+`creditAmount`, the other side 0). Account UUIDs and business references are upper-cased with `Locale.ROOT`, so posting,
+lookup and reversal agree; the public `/api/v1` contract keeps its strict upper-case patterns. `idempotencyKey` is
+accepted for compatibility; replays are detected by business reference plus request fingerprint. The reversal path
+names the ORIGINAL business reference, which is resolved to the entry id before the existing reversal rules run
+(one reversal per original, unique reversal reference, original never modified). Everything else stays denied.
+
+Service-account roles: see `services/transaction-service/README.md` section 13.

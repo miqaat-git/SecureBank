@@ -23,8 +23,10 @@ import org.springframework.data.domain.Persistable;
  */
 @jakarta.persistence.Entity
 @Table(name = "balance_operations",
-        uniqueConstraints = @UniqueConstraint(name = "uq_balance_operations_idempotency_key",
-                columnNames = "idempotency_key"),
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_balance_operations_idempotency_key", columnNames = "idempotency_key"),
+                @UniqueConstraint(name = "uq_balance_operations_reverses", columnNames = "reverses_key")
+        },
         indexes = {
                 @Index(name = "idx_balance_operations_account_created", columnList = "account_id, created_at"),
                 @Index(name = "idx_balance_operations_reference", columnList = "reference_id")
@@ -59,6 +61,10 @@ public class BalanceOperation implements Persistable<UUID> {
     @Column(name = "reference_id", nullable = false, updatable = false, length = 16)
     private UUID referenceId;
 
+    /** For REVERSE_DEBIT only: idempotency key of the DEBIT being reversed. Unique, so a debit is reversed once. */
+    @Column(name = "reverses_key", updatable = false, length = 64)
+    private String reversesKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -72,8 +78,9 @@ public class BalanceOperation implements Persistable<UUID> {
     }
 
     private BalanceOperation(UUID accountId, String idempotencyKey, BalanceOperationType operationType,
-                             BigDecimal amount, BigDecimal resultingBalance, UUID referenceId, Instant now,
-                             String createdBy) {
+                             BigDecimal amount, BigDecimal resultingBalance, UUID referenceId, String reversesKey,
+                             Instant now, String createdBy) {
+        this.reversesKey = reversesKey;
         this.id = UUID.randomUUID();
         this.accountId = accountId;
         this.idempotencyKey = idempotencyKey;
@@ -88,8 +95,16 @@ public class BalanceOperation implements Persistable<UUID> {
     public static BalanceOperation record(UUID accountId, String idempotencyKey, BalanceOperationType type,
                                           BigDecimal amount, BigDecimal resultingBalance, UUID referenceId,
                                           Instant now, String createdBy) {
-        return new BalanceOperation(accountId, idempotencyKey, type, amount, resultingBalance, referenceId, now,
-                createdBy);
+        return new BalanceOperation(accountId, idempotencyKey, type, amount, resultingBalance, referenceId, null,
+                now, createdBy);
+    }
+
+    /** Variant used for REVERSE_DEBIT: records which debit (by idempotency key) is being reversed. */
+    public static BalanceOperation record(UUID accountId, String idempotencyKey, BalanceOperationType type,
+                                          BigDecimal amount, BigDecimal resultingBalance, UUID referenceId,
+                                          String reversesKey, Instant now, String createdBy) {
+        return new BalanceOperation(accountId, idempotencyKey, type, amount, resultingBalance, referenceId,
+                reversesKey, now, createdBy);
     }
 
     /** True when this operation was requested for the same account, type, amount and reference. */
@@ -139,6 +154,10 @@ public class BalanceOperation implements Persistable<UUID> {
 
     public UUID getReferenceId() {
         return referenceId;
+    }
+
+    public String getReversesKey() {
+        return reversesKey;
     }
 
     public Instant getCreatedAt() {

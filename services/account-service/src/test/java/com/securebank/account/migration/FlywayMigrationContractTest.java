@@ -36,6 +36,19 @@ class FlywayMigrationContractTest {
         return read("db/migration/V1__create_account_schema.sql").toLowerCase(Locale.ROOT);
     }
 
+    private static String additiveMigrations() throws IOException {
+        return read("db/migration/V2__internal_operation_contract.sql").toLowerCase(Locale.ROOT);
+    }
+
+    @Test
+    void v2MigrationIsAdditiveAndAddsReversalSupport() throws IOException {
+        String v2 = additiveMigrations();
+        assertThat(v2).contains("'reverse_debit'").contains("reverses_key")
+                .contains("constraint uq_balance_operations_reverses unique (reverses_key)");
+        assertThat(v2).doesNotContain("drop table").doesNotContain("drop column").doesNotContain("truncate")
+                .doesNotContain("delete from").doesNotContain("update ");
+    }
+
     /** Returns the text of the CREATE TABLE statement for the given table. */
     private static String createTable(String sql, String table) {
         Matcher matcher = Pattern.compile("create table " + table + " \\((.*?)\\) engine=innodb", Pattern.DOTALL)
@@ -61,9 +74,10 @@ class FlywayMigrationContractTest {
         List<String> columns = mappedColumns(entity);
         assertThat(columns).isNotEmpty();
         for (String column : columns) {
+            // Columns may come from V1 (CREATE TABLE) or from additive later scripts (ALTER TABLE ... ADD COLUMN).
             assertThat(Pattern.compile("(^|\\s)" + column + "\\s+(binary|varchar|decimal|datetime|bigint)")
-                    .matcher(ddl).find())
-                    .as("column %s.%s must be defined in V1 migration", table, column).isTrue();
+                    .matcher(ddl + "\n" + additiveMigrations()).find())
+                    .as("column %s.%s must be defined in the migrations", table, column).isTrue();
         }
     }
 

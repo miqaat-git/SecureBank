@@ -75,7 +75,7 @@ securebank:
       base-url: ${ACCOUNT_SERVICE_BASE_URL:http://localhost:8082}
       connect-timeout: 2s
       read-timeout: 5s
-      account-path: /api/v1/accounts/{accountId}
+      account-path: /internal/accounts/{accountId}
       operations-path: /internal/accounts/{accountId}/operations
       operation-path: /internal/accounts/{accountId}/operations/{operationId}
     ledger:
@@ -86,8 +86,15 @@ securebank:
       reversal-path: /internal/journal-entries/{businessReference}/reversals
       lookup-path: /internal/journal-entries/by-reference/{businessReference}
     auth:
-      mode: ${SERVICE_AUTH_MODE:NONE}            # NONE | STATIC_BEARER
+      # NONE | STATIC_BEARER | OAUTH2_CLIENT_CREDENTIALS. NONE cannot authenticate to the secured Account/Ledger
+      # internal endpoints: use OAUTH2_CLIENT_CREDENTIALS for any real run (see services/transaction-service/README.md).
+      mode: ${SERVICE_AUTH_MODE:NONE}
       static-token: ${SERVICE_AUTH_TOKEN:}
+      client-id: ${SERVICE_AUTH_CLIENT_ID:securebank-transaction-service}
+      client-secret: ${SERVICE_AUTH_CLIENT_SECRET:}   # never commit; from SECUREBANK_TRANSACTION_CLIENT_SECRET
+      issuer-uri: ${SERVICE_AUTH_ISSUER_URI:}         # e.g. http://localhost:8180/realms/securebank
+      token-uri: ${SERVICE_AUTH_TOKEN_URI:}           # optional override; default <issuer>/protocol/openid-connect/token
+      scope: ${SERVICE_AUTH_SCOPE:}
 
 logging:
   level:

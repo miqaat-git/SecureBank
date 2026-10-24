@@ -45,6 +45,9 @@ public class RemoteHttp {
                 return HttpResult.response(response.getStatusCode().value(),
                         new String(bytes, StandardCharsets.UTF_8));
             });
+        } catch (ServiceTokenException e) {
+            // No token could be obtained, so nothing was sent: provably not applied (never UNKNOWN, never success).
+            return HttpResult.notSent();
         } catch (RestClientException e) {
             return neverSent(e) ? HttpResult.notSent() : HttpResult.ambiguous();
         } catch (RuntimeException e) {

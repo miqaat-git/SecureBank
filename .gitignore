@@ -22,3 +22,6 @@ identity/.keycloak/
 
 # Empty placeholder archive
 /services/account-service.zip
+
+# Local Keycloak recovery backups
+identity/backup/

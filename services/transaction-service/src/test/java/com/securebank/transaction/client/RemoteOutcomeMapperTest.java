@@ -23,6 +23,15 @@ class RemoteOutcomeMapperTest {
     }
 
     @Test
+    void accountConcurrentModificationConflictIsRetryableNotRejected() {
+        RemoteResult r = submit(409, "{\"code\":\"CONCURRENT_MODIFICATION\"}");
+        assertThat(r.outcome()).isEqualTo(Outcome.RETRYABLE_FAILURE);
+        assertThat(r.code()).isEqualTo("CONCURRENT_MODIFICATION");
+        // Any other 409 (e.g. an idempotency-key conflict or an already-reversed debit) stays a rejection.
+        assertThat(submit(409, "{\"code\":\"OPERATION_ALREADY_REVERSED\"}").outcome()).isEqualTo(Outcome.REJECTED);
+    }
+
+    @Test
     void successBodyIsSucceeded() {
         assertThat(submit(200, "{\"status\":\"SUCCEEDED\"}").outcome()).isEqualTo(Outcome.SUCCEEDED);
         assertThat(submit(201, "{\"status\":\"succeeded\"}").outcome()).isEqualTo(Outcome.SUCCEEDED);

@@ -12,6 +12,14 @@ public final class LedgerConstants {
     /** Business references are supplied by the caller (e.g. Transaction Service). Upper-case ASCII only. */
     public static final String BUSINESS_REFERENCE_PATTERN = "^[A-Z0-9][A-Z0-9._:-]{2,99}$";
 
+    /**
+     * Case-insensitive shape accepted at the internal Transaction Service boundary (it sends lower-case UUIDs).
+     * The adapter upper-cases with {@code Locale.ROOT} before the strict patterns above are applied.
+     */
+    public static final String INTERNAL_BUSINESS_REFERENCE_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:-]{2,99}$";
+
+    public static final String INTERNAL_CURRENCY_PATTERN = "^[A-Za-z]{3}$";
+
     public static final String CURRENCY_PATTERN = "^[A-Z]{3}$";
 
     public static final String DEFAULT_CURRENCY = "INR";

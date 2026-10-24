@@ -8,5 +8,9 @@ import java.util.Optional;
  */
 public interface ServiceTokenProvider {
 
+    /**
+     * @throws ServiceTokenException when a token is required but cannot be obtained; the caller must treat the
+     *                               request as not sent
+     */
     Optional<String> bearerToken();
 }

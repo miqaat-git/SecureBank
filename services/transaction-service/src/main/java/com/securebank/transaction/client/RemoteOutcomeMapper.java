@@ -68,9 +68,15 @@ public final class RemoteOutcomeMapper {
             case 504:
                 return RemoteResult.unknown("HTTP_" + s);
             case 409:
-                return "OPERATION_IN_PROGRESS".equals(code)
-                        ? RemoteResult.unknown("OPERATION_IN_PROGRESS")
-                        : RemoteResult.rejected(code != null ? code : "CONFLICT");
+                if ("OPERATION_IN_PROGRESS".equals(code)) {
+                    return RemoteResult.unknown("OPERATION_IN_PROGRESS");
+                }
+                if ("CONCURRENT_MODIFICATION".equals(code)) {
+                    // Account Service rolled back its local transaction after exhausting optimistic-lock retries:
+                    // the operation was provably not applied, and a retry with the same operation id is idempotent.
+                    return RemoteResult.retryable("CONCURRENT_MODIFICATION");
+                }
+                return RemoteResult.rejected(code != null ? code : "CONFLICT");
             default:
                 if (s >= 500) {
                     return RemoteResult.unknown("HTTP_" + s);

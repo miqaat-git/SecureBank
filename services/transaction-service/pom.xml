@@ -49,6 +49,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
+        <!-- OAuth2 client-credentials token acquisition/caching for service-to-service calls. Only the library is
+             added (not the Boot starter), so no client auto-configuration or login filters are activated. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-client</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.flywaydb</groupId>
