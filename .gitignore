@@ -1,0 +1,34 @@
+target/
+**/target/
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+scripts/set-env.local.ps1
+**/set-env.local.ps1
+*.log
+.DS_Store
+
+phase0-dependency-tree.txt
+phase0-flyway-check.txt
+
+# Downloaded Keycloak distribution
+identity/.keycloak/
+
+# Local Keycloak recovery backups
+identity/backup/
+
+# --- Phase 8 sync hardening ---
+*.patch
+.patch-backups/
+scripts/set-env-keycloak.local.ps1
+identity/scripts/set-keycloak-env.local.ps1
+**/*.local.ps1
+*.bak-*
+*.bak
+node_modules/
+**/node_modules/
+dist/
+**/dist/

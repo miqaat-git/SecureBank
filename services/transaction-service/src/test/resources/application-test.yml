@@ -1,0 +1,32 @@
+# Isolated test configuration: in-memory H2 only. Never touches MySQL.
+spring:
+  datasource:
+    url: jdbc:h2:mem:txtest;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  flyway:
+    url: jdbc:h2:mem:txtest;MODE=MySQL;DB_CLOSE_DELAY=-1
+    user: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://issuer.invalid/realms/test   # never contacted: JwtDecoder is mocked in tests
+
+securebank:
+  transfer:
+    max-attempts: 3
+    retry-base-delay: 0s
+    retry-max-delay: 1s
+    recovery:
+      enabled: false
+  clients:
+    account:
+      base-url: http://account.invalid
+    ledger:
+      base-url: http://ledger.invalid

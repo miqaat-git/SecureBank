@@ -1,0 +1,10 @@
+target/
+*.class
+*.log
+.idea/
+*.iml
+.vscode/
+nbproject/private/
+.env
+*.env
+scripts/*.local.*

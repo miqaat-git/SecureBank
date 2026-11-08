@@ -1,0 +1,73 @@
+SecureBank account-service - manifest (every delivered file and its purpose)
+
+.gitignore  --  Excludes build output, IDE files, local env scripts
+README.md  --  Full documentation (setup, API, security, integration, limitations)
+manifest.txt  --  This list
+pom.xml  --  Maven build: Spring Boot 3.5.x parent, Java 21, dependencies
+scripts/mysql-setup.sql  --  Creates securebank_account and least-privilege MySQL users (placeholders for passwords)
+scripts/set-env.example.ps1  --  PowerShell template for the required environment variables (placeholders only)
+src/main/java/com/securebank/account/AccountServiceApplication.java  --  Spring Boot entry point
+src/main/java/com/securebank/account/client/CustomerClient.java  --  Customer Service port (mockable)
+src/main/java/com/securebank/account/client/CustomerSummary.java  --  Minimal customer data read from Customer Service
+src/main/java/com/securebank/account/client/HttpCustomerClient.java  --  HTTP implementation with failure handling
+src/main/java/com/securebank/account/config/AccountProperties.java  --  Typed configuration (customer service, security, limits)
+src/main/java/com/securebank/account/config/ClockConfig.java  --  UTC Clock bean
+src/main/java/com/securebank/account/config/CustomerClientConfig.java  --  RestClient with connect/read timeouts for Customer Service
+src/main/java/com/securebank/account/config/OpenApiConfig.java  --  OpenAPI metadata and bearer security scheme
+src/main/java/com/securebank/account/domain/Account.java  --  Account entity with all balance and status business rules
+src/main/java/com/securebank/account/domain/AccountStatus.java  --  ACTIVE / FROZEN / CLOSED
+src/main/java/com/securebank/account/domain/AccountType.java  --  SAVINGS / CURRENT
+src/main/java/com/securebank/account/domain/BalanceOperation.java  --  Idempotency record of an applied internal balance operation
+src/main/java/com/securebank/account/domain/BalanceOperationType.java  --  DEBIT / CREDIT
+src/main/java/com/securebank/account/domain/Money.java  --  Money rules: scale 2, no rounding, limits
+src/main/java/com/securebank/account/dto/AccountBalanceResponse.java  --  Balance response
+src/main/java/com/securebank/account/dto/AccountResponse.java  --  Account response
+src/main/java/com/securebank/account/dto/AccountStatusResponse.java  --  Status response
+src/main/java/com/securebank/account/dto/BalanceOperationRequest.java  --  Internal debit/credit request
+src/main/java/com/securebank/account/dto/BalanceOperationResponse.java  --  Internal operation response
+src/main/java/com/securebank/account/dto/CreateAccountRequest.java  --  Create request (no balance field)
+src/main/java/com/securebank/account/dto/PageResponse.java  --  Pagination envelope
+src/main/java/com/securebank/account/dto/StatusChangeRequest.java  --  Freeze/unfreeze reason
+src/main/java/com/securebank/account/exception/ApiError.java  --  Standard error body
+src/main/java/com/securebank/account/exception/ApiException.java  --  Business exception with error code
+src/main/java/com/securebank/account/exception/ErrorCode.java  --  Error codes and HTTP statuses
+src/main/java/com/securebank/account/exception/GlobalExceptionHandler.java  --  Centralized exception handling
+src/main/java/com/securebank/account/mapper/AccountMapper.java  --  Explicit entity to DTO mapping
+src/main/java/com/securebank/account/repository/AccountRepository.java  --  Account repository
+src/main/java/com/securebank/account/repository/AccountSpecifications.java  --  Optional search filters
+src/main/java/com/securebank/account/repository/BalanceOperationRepository.java  --  Balance operation repository
+src/main/java/com/securebank/account/security/CallerContext.java  --  Authenticated caller (admin / customer id) for the service layer
+src/main/java/com/securebank/account/security/CallerResolver.java  --  Builds CallerContext from the security context
+src/main/java/com/securebank/account/security/KeycloakJwtAuthenticationConverter.java  --  Maps Keycloak roles to ROLE_* authorities
+src/main/java/com/securebank/account/security/LazyJwtDecoder.java  --  Defers issuer discovery until first token (fail closed)
+src/main/java/com/securebank/account/security/RestSecurityErrorHandlers.java  --  JSON 401/403 responses
+src/main/java/com/securebank/account/security/SecurityConfig.java  --  Stateless resource-server security rules and production JwtDecoder
+src/main/java/com/securebank/account/service/AccountNumberGenerator.java  --  Account number generator port
+src/main/java/com/securebank/account/service/AccountService.java  --  Account use cases and authorization rules
+src/main/java/com/securebank/account/service/BalanceOperationService.java  --  Idempotent internal balance operations with bounded retry
+src/main/java/com/securebank/account/service/SecureAccountNumberGenerator.java  --  SecureRandom 13-digit number with Luhn check digit
+src/main/java/com/securebank/account/web/AccountController.java  --  Customer/admin account endpoints
+src/main/java/com/securebank/account/web/AdminAccountController.java  --  Admin search, freeze, unfreeze
+src/main/java/com/securebank/account/web/InternalBalanceController.java  --  Internal Transaction Service endpoint
+src/main/resources/application.properties  --  Production configuration: port 8082, Hikari, Flyway, ddl-auto=validate, actuator, logging, settings
+src/main/resources/db/migration/V1__create_account_schema.sql  --  Flyway V1: accounts and balance_operations tables, constraints, indexes
+src/test/java/com/securebank/account/client/HttpCustomerClientTest.java  --  Customer Service success and failure modes
+src/test/java/com/securebank/account/domain/AccountTest.java  --  Entity business rules and precision
+src/test/java/com/securebank/account/domain/MoneyTest.java  --  Money rules
+src/test/java/com/securebank/account/migration/FlywayMigrationContractTest.java  --  Flyway script vs entity mapping contract
+src/test/java/com/securebank/account/repository/AccountRepositoryTest.java  --  JPA mappings, precision, unique constraints
+src/test/java/com/securebank/account/security/KeycloakJwtAuthenticationConverterTest.java  --  Keycloak role mapping
+src/test/java/com/securebank/account/service/SecureAccountNumberGeneratorTest.java  --  Account number format and uniqueness
+src/test/java/com/securebank/account/support/AbstractIntegrationTest.java  --  Shared fixtures
+src/test/java/com/securebank/account/support/AccountIntegrationTest.java  --  Composed annotation for full-context tests
+src/test/java/com/securebank/account/support/TestJwtDecoderConfig.java  --  Test-only JwtDecoder stub
+src/test/java/com/securebank/account/support/TestJwts.java  --  Mock JWT helpers (admin/customer/service)
+src/test/java/com/securebank/account/web/AccountCreationTest.java  --  Creation, validation, Customer Service, ownership
+src/test/java/com/securebank/account/web/AccountLifecycleTest.java  --  Freeze/unfreeze, closure, no balance writes
+src/test/java/com/securebank/account/web/AccountNumberCollisionTest.java  --  Account number collision retry
+src/test/java/com/securebank/account/web/AccountQueryTest.java  --  Retrieval, listing, pagination, status, balance
+src/test/java/com/securebank/account/web/ApiErrorHandlingTest.java  --  Error format and safe messages
+src/test/java/com/securebank/account/web/ConcurrencyTest.java  --  Optimistic locking and idempotency under concurrency
+src/test/java/com/securebank/account/web/InternalBalanceOperationTest.java  --  Internal operations, idempotency, authorization
+src/test/java/com/securebank/account/web/SecurityTest.java  --  Security rules and public endpoints
+src/test/resources/application-test.properties  --  Test-only configuration (H2 in memory, no external systems)
