@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.0
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: kcadmin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_HTTP_PORT: 8180
+      SECUREBANK_DEV_ADMIN_PASSWORD: ZCuNsBivLcBmbtyBa2W7aBaC
+      SECUREBANK_DEV_CUSTOMER_PASSWORD: oYZEJ2cBcxMTtK4F5ytMtMzh
+      SECUREBANK_ACCOUNT_CLIENT_SECRET: 55G84ccfddKXtCMGqaH2HPuitsZKHRvVRafAx3ke
+      SECUREBANK_TRANSACTION_CLIENT_SECRET: U6evhxw68YQbCNZTJjtvwfQMtbMWocSzRGJrJjRu
+    ports:
+      - "8180:8180"
+    volumes:
+      - ./identity/keycloak/securebank-realm.json:/opt/keycloak/data/import/securebank-realm.json
+
+  gateway:
+    build: ./services/api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SECUREBANK_JWT_ISSUER_URI=http://localhost:8180/realms/securebank
+      - CUSTOMER_SERVICE_BASE_URL=http://customer-service:8081
+      - ACCOUNT_SERVICE_BASE_URL=http://account-service:8082
+      - LEDGER_SERVICE_BASE_URL=http://ledger-service:8083
+      - TRANSACTION_SERVICE_BASE_URL=http://transaction-service:8084
+    depends_on:
+      - keycloak
+
+  customer-service:
+    build: ./services/customer-service
+    ports:
+      - "8081:8081"
+    environment:
+      - CUSTOMER_DB_URL=jdbc:mysql://mysql:3306/securebank_customer
+      - CUSTOMER_DB_USERNAME=root
+      - CUSTOMER_DB_PASSWORD=rootpassword
+      - CUSTOMER_JWT_ISSUER_URI=http://localhost:8180/realms/securebank
+    depends_on:
+      - mysql
+      - keycloak
+
+  account-service:
+    build: ./services/account-service
+    ports:
+      - "8082:8082"
+    environment:
+      - ACCOUNT_DB_URL=jdbc:mysql://mysql:3306/securebank_account
+      - ACCOUNT_DB_USERNAME=root
+      - ACCOUNT_DB_PASSWORD=rootpassword
+      - ACCOUNT_JWT_ISSUER_URI=http://localhost:8180/realms/securebank
+    depends_on:
+      - mysql
+      - keycloak
+
+  ledger-service:
+    build: ./services/ledger-service
+    ports:
+      - "8083:8083"
+    environment:
+      - LEDGER_DB_URL=jdbc:mysql://mysql:3306/securebank_ledger
+      - LEDGER_DB_USERNAME=root
+      - LEDGER_DB_PASSWORD=rootpassword
+      - LEDGER_JWT_ISSUER_URI=http://localhost:8180/realms/securebank
+    depends_on:
+      - mysql
+      - keycloak
+
+  transaction-service:
+    build: ./services/transaction-service
+    ports:
+      - "8084:8084"
+    environment:
+      - TRANSACTION_DB_URL=jdbc:mysql://mysql:3306/securebank_transaction
+      - TRANSACTION_DB_USERNAME=root
+      - TRANSACTION_DB_PASSWORD=rootpassword
+      - SECUREBANK_JWT_ISSUER_URI=http://localhost:8180/realms/securebank
+    depends_on:
+      - mysql
+      - keycloak
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
