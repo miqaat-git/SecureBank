@@ -32,3 +32,10 @@ node_modules/
 **/node_modules/
 dist/
 **/dist/
+
+# Additional security exclusions
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
